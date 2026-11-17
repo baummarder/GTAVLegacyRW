@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+import build  # noqa: E402
 import buildiso  # noqa: E402
 import imgtool  # noqa: E402
 import pycdlib  # noqa: E402
@@ -182,17 +183,21 @@ class BuildTest(unittest.TestCase):
             (interior / "new_interior.txd").write_bytes(b"interior-texture")
 
             output = work / "out.iso"
-            exit_code = buildiso.main(
-                [
-                    "--config", str(ROOT / "config.ini"),
-                    "--iso", str(original_iso),
-                    "--project-dir", str(project),
-                    "--build-dir", str(work / "build"),
-                    "--output", str(output),
-                    "--allow-modded",
-                ]
-            )
-            self.assertEqual(exit_code, 0, "build failed")
+            options = [
+                "--config", str(ROOT / "config.ini"),
+                "--iso", str(original_iso),
+                "--project-dir", str(project),
+                "--build-dir", str(work / "build"),
+                "--output", str(output),
+                "--allow-modded",
+            ]
+
+            # The central tool runs the complete pipeline, including verification.
+            self.assertEqual(build.main(options), 0, "build failed")
+            self.assertTrue(output.is_file())
+
+            # A second run with --reuse-build reuses the extraction.
+            self.assertEqual(build.main(options + ["--reuse-build"]), 0, "rebuild failed")
             self.assertTrue(output.is_file())
 
             iso = pycdlib.PyCdlib()
@@ -238,6 +243,82 @@ class BuildTest(unittest.TestCase):
                 self.assertNotIn("GTA3_1.IMG", iso_children(iso, "/MODELS"))
             finally:
                 iso.close()
+
+
+class StageTest(unittest.TestCase):
+    def test_stage_registry(self) -> None:
+        keys = [stage.key for stage in buildiso.STAGES]
+        self.assertEqual(
+            keys,
+            ["preflight", "prepare", "extract", "overlay", "audio", "images", "package", "verify"],
+        )
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertEqual(set(buildiso.STAGES_BY_KEY), set(keys))
+
+    def test_select_stages(self) -> None:
+        self.assertEqual(buildiso.select_stages(["extract", "images"]), ["extract", "images"])
+        self.assertEqual(
+            buildiso.select_stages(None, ["audio"]),
+            ["preflight", "prepare", "extract", "overlay", "images", "package", "verify"],
+        )
+        with self.assertRaises(buildiso.BuildError):
+            buildiso.select_stages(["nope"])
+
+
+class CliTest(unittest.TestCase):
+    def setUp(self) -> None:
+        logging.disable(logging.CRITICAL)
+
+    def tearDown(self) -> None:
+        logging.disable(logging.NOTSET)
+
+    def test_dry_run_changes_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            original_iso = work / "game.iso"
+            make_iso(original_iso, {"SYSTEM.CNF": b"boot"})
+            output = work / "out.iso"
+            build_dir = work / "build"
+
+            code = build.main(
+                [
+                    "--config", str(ROOT / "config.ini"),
+                    "--iso", str(original_iso),
+                    "--project-dir", str(ROOT / "src"),
+                    "--build-dir", str(build_dir),
+                    "--output", str(output),
+                    "--allow-modded",
+                    "--dry-run",
+                ]
+            )
+
+            self.assertEqual(code, 0)
+            self.assertFalse(output.exists())
+            self.assertFalse(build_dir.exists())
+
+    def test_check_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            original_iso = work / "game.iso"
+            make_iso(original_iso, {"SYSTEM.CNF": b"boot"})
+
+            code = build.main(
+                [
+                    "check",
+                    "--config", str(ROOT / "config.ini"),
+                    "--iso", str(original_iso),
+                    "--project-dir", str(ROOT / "src"),
+                    "--build-dir", str(work / "build"),
+                    "--output", str(work / "out.iso"),
+                    "--allow-modded",
+                ]
+            )
+
+            self.assertEqual(code, 0)
+
+    def test_unknown_stage_fails(self) -> None:
+        code = build.main(["all", "--only", "nope"])
+        self.assertEqual(code, 1)
 
 
 class IsoPathTest(unittest.TestCase):

@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-"""GTA V Legacy builder.
+"""GTA V Legacy build stages.
 
 Overlays the mod content from ``src/`` onto an unmodified GTA San Andreas
 (PS2, NTSC-U v1.03) ISO, rebuilds the ``.img`` archives and writes a new,
 patched ISO. Everything is done in pure Python, so the build runs on Windows,
 Linux and macOS without UltraISO or other external tools.
 
+This module owns the individual build stages and their order. Use ``build.py``
+for the central command line interface; ``python buildiso.py`` still works and
+runs every stage exactly like before.
+
 Examples
 --------
-    python buildiso.py
-    python buildiso.py --iso "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
-    python buildiso.py --output "GTA V Legacy.iso" --verbose
-    python buildiso.py --reuse-build
+    python build.py
+    python build.py --iso "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
+    python build.py iso --output "GTA V Legacy.iso" --verbose
+    python build.py check
 
-Run ``python buildiso.py --help`` for all options.
+Run ``python build.py --help`` for all options.
 """
 
 from __future__ import annotations
@@ -31,11 +35,12 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import imgtool
 
 APP_NAME = "GTA V Legacy builder"
-APP_VERSION = "0.3"
+APP_VERSION = "0.4"
 
 DEFAULT_CONFIG = "config.ini"
 BUF_SIZE = 65536
@@ -56,6 +61,23 @@ IMG_ASSET_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 ISO_NAME_RE = re.compile(r"^[A-Z0-9_]+$")
+
+#: Packages that the ISO build always needs.
+REQUIRED_PACKAGES: dict[str, str] = {"pycdlib": "pycdlib"}
+
+#: Packages that are only needed when the audio streams are present.
+OPTIONAL_PACKAGES: dict[str, str] = {"py7zr": "py7zr"}
+
+#: Rough space estimate: input ISO + extracted build folder + output ISO.
+DISK_SPACE_FACTOR = 2.5
+
+#: Entries that every finished build must contain.
+REQUIRED_ISO_ENTRIES = (
+    "/SYSTEM.CNF;1",
+    "/SLUS_209.46;1",
+    "/MODELS/GTA3.IMG;1",
+    "/MODELS/GTA_INT.IMG;1",
+)
 
 log = logging.getLogger("gtavlegacy")
 
@@ -124,6 +146,39 @@ def human_size(size: int) -> str:
             return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} B"
         value /= 1024.0
     return f"{size} B"
+
+
+def format_duration(seconds: float) -> str:
+    """Format a duration for the build summary."""
+    if seconds < 1.0:
+        return f"{seconds * 1000:.0f} ms"
+    if seconds < 60.0:
+        return f"{seconds:.1f} s"
+    minutes, rest = divmod(int(round(seconds)), 60)
+    return f"{minutes} min {rest} s"
+
+
+def missing_packages(modules: tuple[str, ...] | dict[str, str]) -> list[str]:
+    """Return the pip names of packages that cannot be imported."""
+    names = modules.items() if isinstance(modules, dict) else ((name, name) for name in modules)
+    missing: list[str] = []
+    for module_name, pip_name in names:
+        try:
+            importlib.import_module(module_name)
+        except ImportError:
+            missing.append(pip_name)
+    return missing
+
+
+def require_packages(modules: tuple[str, ...] | dict[str, str]) -> None:
+    missing = missing_packages(modules)
+    if missing:
+        packages = ", ".join(sorted(set(missing)))
+        raise BuildError(
+            f"Missing Python package(s): {packages}\n"
+            f"Install them with: {sys.executable} -m pip install -r requirements.txt\n"
+            "Or run: python build.py deps --install"
+        )
 
 
 def copy_tree(src: Path, dst: Path) -> None:
@@ -409,6 +464,211 @@ def write_iso(settings: Settings) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Stages
+# --------------------------------------------------------------------------- #
+
+
+def warn_free_space(settings: Settings, iso_size: int) -> None:
+    """Warn when the target drives are too small for a full build."""
+    needed = int(iso_size * DISK_SPACE_FACTOR)
+
+    probes = {"build folder": settings.build, "output": settings.output.parent}
+    seen: set[Path] = set()
+    for label, path in probes.items():
+        probe = path
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        try:
+            resolved = probe.resolve()
+        except OSError:  # pragma: no cover - unusual on real systems
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+
+        try:
+            free = shutil.disk_usage(probe).free
+        except OSError:  # pragma: no cover - unusual on real systems
+            continue
+
+        log.info("      Free space (%s): %s", label, human_size(free))
+        if free < needed:
+            log.warning(
+                "      Only %s left for the %s; a full build needs roughly %s.",
+                human_size(free),
+                label,
+                human_size(needed),
+            )
+
+
+def check_environment(settings: Settings) -> None:
+    """Validate packages, paths, disc space and the input ISO."""
+    if not settings.project.is_dir():
+        raise BuildError(f"Project folder not found: {settings.project}")
+
+    packages = dict(REQUIRED_PACKAGES)
+    if collect_stream_parts(settings.project / "audio" / "STREAMS"):
+        packages.update(OPTIONAL_PACKAGES)
+    require_packages(packages)
+
+    check_iso(settings.iso, settings.allow_modded)
+    warn_free_space(settings, settings.iso.stat().st_size)
+
+
+def prepare_build_folder(settings: Settings) -> None:
+    if settings.build.exists() and not settings.reuse_build:
+        log.info("      Removing previous build folder.")
+        shutil.rmtree(settings.build)
+    settings.build.mkdir(parents=True, exist_ok=True)
+
+
+def extract_stage(settings: Settings) -> None:
+    if settings.reuse_build and (settings.build / "models" / "gta3.img").is_file():
+        log.info("      Existing extraction found, skipping.")
+        return
+    extract_iso(settings.iso, settings.build)
+
+
+def overlay_stage(settings: Settings) -> None:
+    install_project_files(settings.project, settings.build)
+
+
+def audio_stage(settings: Settings) -> None:
+    unpack_streams(
+        settings.project / "audio" / "STREAMS",
+        settings.build / "audio" / "STREAMS",
+    )
+
+
+def images_stage(settings: Settings) -> None:
+    rebuild_img_archives(settings)
+
+
+def package_stage(settings: Settings) -> None:
+    write_iso(settings)
+
+
+def verify_output(settings: Settings) -> None:
+    """Reopen the finished ISO and make sure the important entries exist."""
+    pycdlib = require_module("pycdlib", "pycdlib")
+    output = settings.output
+
+    if not output.is_file() or output.stat().st_size == 0:
+        raise BuildError(f"Output ISO is missing or empty: {output}")
+
+    files = 0
+    directories = 0
+    iso = pycdlib.PyCdlib()
+    try:
+        iso.open(str(output))
+
+        for required in REQUIRED_ISO_ENTRIES:
+            try:
+                iso.get_record(iso_path=required)
+            except Exception as exc:  # pycdlib raises different errors per version
+                raise BuildError(
+                    f"The generated ISO is missing {required.strip('/')}."
+                ) from exc
+
+        pending = [iso.get_record(iso_path="/")]
+        while pending:
+            record = pending.pop()
+            iso_path = iso.full_path_from_dirrecord(record, False)
+            for child in iso.list_children(iso_path=iso_path):
+                if child is None or child.is_dot() or child.is_dotdot():
+                    continue
+                if child.is_dir():
+                    directories += 1
+                    pending.append(child)
+                else:
+                    files += 1
+    finally:
+        iso.close()
+
+    log.info("      %s (%s)", output, human_size(output.stat().st_size))
+    log.info("      %d files, %d folders", files, directories)
+
+
+@dataclass(frozen=True)
+class Stage:
+    """One independent step of the build."""
+
+    key: str
+    title: str
+    description: str
+    function: Callable[[Settings], None]
+
+
+#: Every stage in the order the full build runs them.
+STAGES: tuple[Stage, ...] = (
+    Stage(
+        "preflight",
+        "Checking configuration and input ISO",
+        "Validate the config, Python packages, free space and the ISO checksum.",
+        check_environment,
+    ),
+    Stage(
+        "prepare",
+        "Preparing build folder",
+        "Create a clean working folder (or keep an existing one).",
+        prepare_build_folder,
+    ),
+    Stage(
+        "extract",
+        "Extracting ISO",
+        "Unpack the original ISO into the build folder.",
+        extract_stage,
+    ),
+    Stage(
+        "overlay",
+        "Copying mod files",
+        "Overlay src/ onto the extracted ISO.",
+        overlay_stage,
+    ),
+    Stage(
+        "audio",
+        "Unpacking audio streams",
+        "Join and extract the STREAMS.7z parts.",
+        audio_stage,
+    ),
+    Stage(
+        "images",
+        "Rebuilding IMG archives",
+        "Merge the assets into gta3.img and gta_int.img.",
+        images_stage,
+    ),
+    Stage(
+        "package",
+        "Writing ISO",
+        "Package the build folder as an ISO9660 level 1 image.",
+        package_stage,
+    ),
+    Stage(
+        "verify",
+        "Verifying output",
+        "Reopen the finished ISO and check its contents.",
+        verify_output,
+    ),
+)
+
+STAGES_BY_KEY: dict[str, Stage] = {stage.key: stage for stage in STAGES}
+
+
+def select_stages(only: list[str] | None = None, skip: list[str] | None = None) -> list[str]:
+    """Return the stage keys to run after applying ``--only``/``--skip``."""
+    unknown = [key for key in (only or []) + (skip or []) if key not in STAGES_BY_KEY]
+    if unknown:
+        raise BuildError(
+            "Unknown stage(s): " + ", ".join(unknown) + "\n"
+            "Run 'python build.py stages' to list the available stages."
+        )
+
+    selected = [stage.key for stage in STAGES] if only is None else list(dict.fromkeys(only))
+    skipped = set(skip or [])
+    return [key for key in selected if key not in skipped]
+
+
+# --------------------------------------------------------------------------- #
 # Configuration & CLI
 # --------------------------------------------------------------------------- #
 
@@ -460,12 +720,8 @@ def load_settings(args: argparse.Namespace) -> Settings:
     )
 
 
-def parse_args(argv: list[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        prog="buildiso.py",
-        description=f"{APP_NAME} v{APP_VERSION} - builds a patched GTA San Andreas (PS2) ISO.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
+def add_build_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """Add the options shared by ``build.py`` and ``buildiso.py``."""
     parser.add_argument("--config", type=Path, default=Path(DEFAULT_CONFIG),
                         help="Path to the build configuration")
     parser.add_argument("--iso", type=Path, help="Original GTA San Andreas (NTSC-U v1.03) ISO")
@@ -482,53 +738,50 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                             help="Force a clean build (removes the build folder)")
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
+    return parser
+
+
+def parse_args(argv: list[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="buildiso.py",
+        description=f"{APP_NAME} v{APP_VERSION} - builds a patched GTA San Andreas (PS2) ISO.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    add_build_arguments(parser)
     return parser.parse_args(argv)
 
 
-def run(settings: Settings) -> None:
+def run(settings: Settings, selected: list[str] | None = None) -> list[tuple[Stage, float]]:
+    """Run the selected stages and return their timings."""
+    keys = select_stages(selected)
+    stages = [STAGES_BY_KEY[key] for key in keys]
+
     log.info("%s v%s", APP_NAME, APP_VERSION)
     log.info("      Project: %s", settings.project)
     log.info("      Build:   %s", settings.build)
-
-    if not settings.project.is_dir():
-        raise BuildError(f"Project folder not found: {settings.project}")
-
-    # Validate everything *before* touching the build folder, so a typo in the
-    # configuration cannot wipe an existing extraction.
-    log.info("[1/8] Checking input ISO ...")
-    check_iso(settings.iso, settings.allow_modded)
-
-    log.info("[2/8] Preparing build folder ...")
-    if settings.build.exists() and not settings.reuse_build:
-        shutil.rmtree(settings.build)
-    settings.build.mkdir(parents=True, exist_ok=True)
-
-    log.info("[3/8] Extracting ISO ...")
-    if settings.reuse_build and (settings.build / "models" / "gta3.img").is_file():
-        log.info("      Existing extraction found, skipping.")
-    else:
-        extract_iso(settings.iso, settings.build)
-
-    log.info("[4/8] Copying mod files ...")
-    install_project_files(settings.project, settings.build)
-
-    log.info("[5/8] Unpacking audio streams ...")
-    unpack_streams(
-        settings.project / "audio" / "STREAMS",
-        settings.build / "audio" / "STREAMS",
-    )
-
-    log.info("[6/8] Rebuilding IMG archives ...")
-    rebuild_img_archives(settings)
-
-    log.info("[7/8] Writing ISO ...")
-    write_iso(settings)
-
-    log.info("[8/8] Verifying output ...")
-    size = settings.output.stat().st_size
-    log.info("      %s (%s)", settings.output, human_size(size))
+    log.info("      Output:  %s", settings.output)
     log.info("")
-    log.info("Done.")
+
+    results: list[tuple[Stage, float]] = []
+    started_all = time.perf_counter()
+    total = len(stages)
+
+    for index, stage in enumerate(stages, 1):
+        log.info("[%d/%d] %s ...", index, total, stage.title)
+        started = time.perf_counter()
+        stage.function(settings)
+        elapsed = time.perf_counter() - started
+        results.append((stage, elapsed))
+        log.info("      done in %s", format_duration(elapsed))
+
+    elapsed_all = time.perf_counter() - started_all
+    log.info("")
+    log.info(
+        "Done. %d stage(s) in %s.",
+        len(results),
+        format_duration(elapsed_all),
+    )
+    return results
 
 
 def main(argv: list[str] | None = None) -> int:
