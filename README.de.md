@@ -24,6 +24,7 @@ Das Ergebnis ist ein spielbares ISO für echte PS2-Hardware (z. B. via FreeMcBoo
 - [config.ini](#configini)
 - [Wie der Build abläuft](#wie-der-build-abläuft)
 - [Projektstruktur](#projektstruktur)
+- [Sprache und Benennung](#sprache-und-benennung)
 - [Assets hinzufügen](#assets-hinzufügen)
 - [Audio / Radio-Streams](#audio--radio-streams)
 - [Bekannte Stolperfallen](#bekannte-stolperfallen)
@@ -232,6 +233,8 @@ GTAVLegacy/
 ├─ tests/test_smoke.py       # End-to-End-Test mit Fake-ISO
 ├─ .githooks/                # prepare-commit-msg-Hook (Co-Author-Trailer)
 ├─ IMGconsole_32-bit/        # Legacy: fastman92 IMG Console, ungenutzt
+├─ music-installer/          # Legacy: GTA-SA-Musik-/Audio-Installer-Tools
+├─ legalize/                 # normalisiertes GTA-V-Audio (Cutscenes, Stimmen, Musik)
 ├─ src/                      # Alle Mod-Inhalte
 │  ├─ anim/                  # IFP-Animationen (ped.ifp, gangs.ifp)
 │  ├─ assets/                # Quelldateien, die in die IMGs wandern
@@ -255,6 +258,22 @@ GTAVLegacy/
 ```
 
 Wichtig: `build/` und die temporären `IMGconsole_32-bit/gta3*`-Ordner sind **Artefakte**, keine Quelle (und per `.gitignore` ausgeschlossen). Änderungen gehören immer nach `src/`.
+
+---
+
+## Sprache und Benennung
+
+Das Repository ist englisch-first, damit international daran gearbeitet werden kann:
+
+| Regel | Grund |
+|---|---|
+| Ordner, Dateinamen, Code, Kommentare und Doku sind Englisch. | Hält Build und Workflow für alle verständlich. |
+| [`README.de.md`](README.de.md) ist die einzige deutsche Datei. | Sie ist eine ausdrückliche Übersetzung, nicht die Hauptdokumentation. |
+| Spieldaten behalten ihre Originalnamen (`HANDLING.CFG`, `VEHICLES.IDE`, `GTA3.IMG`, …). | Die Engine sucht sie über den Namen; Umbenennen bricht das Spiel. |
+| Konvertierte Modelle und Texturen behalten ihre Asset-Namen (`stretch.dff`, `comet.txd`, …). | IDE-Dateien und Skripte referenzieren sie über den Namen. |
+| Für alles in `build/` gelten weiterhin die ISO9660-Level-1-Regeln. | 8.3-Namen, Großbuchstaben, `A-Z 0-9 _`. |
+
+Nicht-englische Legacy-Ordner wurden übersetzt: `Instalador de Musicas` → `music-installer`, `legalize/legalize/falas` → `voices`, `legalize/legalize/musicas` → `music`; die russischen Ordner unter `src/assets/Cars to convert/` sind jetzt ebenfalls Englisch. Auch die fremdsprachigen Readmes in den konvertierten Asset-Paketen wurden übersetzt.
 
 ---
 

@@ -1,38 +1,37 @@
-
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=GTA SA MTL BARRACKS SEMI SA STYLE-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==-=-=-=-=
 
-                              Muchas gracias por Bajar el mod!!!! ;)
+                              Thank you very much for downloading the mod!!!! ;)
 
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==-=-=-=-=
 
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==-=-=-=-=
 
-DESCRIPCION:
+DESCRIPTION:
 
-BARRACKS OL original de GTA SA, adaptado a una version de camion remolcador similar al BARRACKS SEMI de GTA V.
+Original GTA SA Barracks OL, adapted into a tow-truck version similar to the GTA V Barracks Semi.
 
-* Logos de MTL, FLATBED y ZANCUDO provenientes de GTA V
-* Esquema de pintura de Camuflaje 
-* Suspension levantada, ruedas mas grandes y Ruedas Morochas en la parte tracera
-* Frontal completo adapatdo a un capot inverso (Como en las Versiones, GTA V y la vida real)
-  - AñadidOS retrovisores y mataburros al capot.
-* Totalmente Repintable con detalles en 2 tonos
-* Puede aparecer con o sin techo
+* MTL, FLATBED and ZANCUDO logos taken from GTA V
+* Camouflage paint scheme
+* Raised suspension, larger wheels and dual rear wheels
+* Full front end adapted to a reversed hood (as in GTA V and in real life)
+  - Added mirrors and bull bars on the hood
+* Fully repaintable with two-tone details
+* Can appear with or without a roof
 
 
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-INSTALACION:
+INSTALLATION:
 
-* puedes instalarlo usando "San Andreas Mod Installer (SAMI)", "Alci`s IMG Editor" o alguna otra herramienta similar
+* You can install it with "San Andreas Mod Installer (SAMI)", "Alci's IMG Editor" or a similar tool
 
 
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 DATA:
 
-Usar estas lineas en la Carpeta "DATA" del juego
+Use these lines in the game's "DATA" folder
 
 carcols.dat:
 petro, 44,36, 13,118, 14,123, 120,123, 112,120, 84,110, 76,102  
@@ -44,13 +43,13 @@ vehicles.ide:
 514, 	petro, 		petro, 		car, 		PETROL, 	PETROL, 	truck,	worker,	 	5,	0,	0,		-1, 1.5, 1.5,	-1
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-cREDITOS:
+CREDITS:
 
-* Modelos y Texturas: Rockstargames.
+* Models and textures: Rockstar Games.
 
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
- Muchas gracias por Bajar el mod!!!! ;)
+ Thank you very much for downloading the mod!!!! ;)
 
 -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 

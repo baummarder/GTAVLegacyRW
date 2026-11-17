@@ -1,19 +1,16 @@
---------------------------Сreated by DG Studio-----------------------------
+--------------------------Created by DG Studio-----------------------------
 
-Брошенные машины из GTA 5 теперь и в SA
- 
-особенности:
-- модели среднего качества.
-- текстуры с мип мапами
-- стандартная коллизия 
-- заменяет стандартные модели (не добовляет новых)
+Abandoned cars from GTA 5, now in SA
 
-Инструкция по установке:
-1)заменить файлы в gta3.img
-2)всё :)
+features:
+- medium quality models.
+- textures with mipmaps
+- standard collision
+- replaces the standard models (does not add new ones)
 
-удачной игры.
+Installation instructions:
+1) replace the files in gta3.img
+2) that's it :)
+
+Have fun.
 ------------------------------------------------------------------------
-
-
-

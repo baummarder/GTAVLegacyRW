@@ -1,5 +1,5 @@
---------------------------Сreated by DG Studio-----------------------------
-Текстурки с пк версии GTA 5 имеют Mipmap и сжатие dxt5 (повышает качество текстур)
+--------------------------Created by DG Studio-----------------------------
+Textures from the PC version of GTA 5 have mipmaps and dxt5 compression (this improves the texture quality)
 
-P.S. Эти текстуры не будут отображаться в Map Editor
+P.S. These textures will not be displayed in the Map Editor
 ------------------------------------------------------------------------

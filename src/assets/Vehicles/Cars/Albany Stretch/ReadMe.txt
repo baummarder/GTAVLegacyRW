@@ -1,8 +1,8 @@
 Stretch
-Автор: TommyAssassin
+Author: TommyAssassin
 
-Stretch из GTA V, выполненный в стиле оригинальных авто GTA San Andreas.
+Stretch from GTA V, built in the style of the original GTA San Andreas cars.
 
-Установка: программой для редактирования IMG-архивов (рекомендую Alci's IMG Editor) добавить файлы stretch.dff и stretch.txd в GTA San Andreas/models/gta3.img с заменой оригинальных.
+Installation: use an IMG archive editor (I recommend Alci's IMG Editor) to add the stretch.dff and stretch.txd files to GTA San Andreas/models/gta3.img, replacing the originals.
 
-Дополнительных настроек авто не требует. Отлично подходит для мультиплеера.
+The car needs no additional settings. It is great for multiplayer.

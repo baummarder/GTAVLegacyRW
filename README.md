@@ -24,6 +24,7 @@ The result is a playable ISO for real PS2 hardware (e.g. via FreeMcBoot/OPL) or 
 - [config.ini](#configini)
 - [How the build works](#how-the-build-works)
 - [Project layout](#project-layout)
+- [Language and naming](#language-and-naming)
 - [Adding assets](#adding-assets)
 - [Audio / radio streams](#audio--radio-streams)
 - [Known pitfalls](#known-pitfalls)
@@ -232,6 +233,8 @@ GTAVLegacy/
 ├─ tests/test_smoke.py       # end-to-end test with a fake ISO
 ├─ .githooks/                # prepare-commit-msg hook (co-author trailers)
 ├─ IMGconsole_32-bit/        # legacy: fastman92 IMG Console, no longer used
+├─ music-installer/          # legacy: GTA SA music and audio installer tools
+├─ legalize/                 # normalised GTA V audio (cutscenes, voices, music)
 ├─ src/                      # All mod content
 │  ├─ anim/                  # IFP animations (ped.ifp, gangs.ifp)
 │  ├─ assets/                # Source files that go into the IMGs
@@ -255,6 +258,22 @@ GTAVLegacy/
 ```
 
 Important: `build/` and the temporary `IMGconsole_32-bit/gta3*` folders are **artifacts**, not sources (and git-ignored). Changes always belong in `src/`.
+
+---
+
+## Language and naming
+
+The repository is English-first so that it can be worked on internationally:
+
+| Rule | Reason |
+|---|---|
+| Folders, file names, code, comments and documentation are English. | Keeps the build and the workflow understandable for everyone. |
+| [`README.de.md`](README.de.md) is the only German file. | It is an explicit translation, not the primary documentation. |
+| Game data keeps its original names (`HANDLING.CFG`, `VEHICLES.IDE`, `GTA3.IMG`, …). | The engine looks these up by name; renaming them breaks the game. |
+| Converted models and textures keep their asset names (`stretch.dff`, `comet.txd`, …). | IDE files and scripts reference them by name. |
+| Everything inside `build/` must still follow ISO9660 level 1. | 8.3 names, uppercase, `A-Z 0-9 _`. |
+
+Non-English legacy folders have been translated: `Instalador de Musicas` → `music-installer`, `legalize/legalize/falas` → `voices`, `legalize/legalize/musicas` → `music`, and the Russian folders under `src/assets/Cars to convert/` are English now as well. The non-English readmes shipped with the converted asset packs were translated too.
 
 ---
 
