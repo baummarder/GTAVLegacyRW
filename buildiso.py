@@ -57,6 +57,10 @@ STREAM_PART_RE = re.compile(r"^STREAMS\.7z\.(\d+)$", re.IGNORECASE)
 #: Files that are documentation, not game assets.
 IGNORED_SUFFIXES = (".txt", ".cfg", ".ide", ".dat")
 
+#: Operating-system metadata that can appear beside extracted assets.
+IGNORED_FILENAMES = {"desktop.ini", "thumbs.db", ".ds_store"}
+IGNORED_PROJECT_NAMES = IGNORED_FILENAMES | {".vscode", "__pycache__", ".git"}
+
 #: Which asset folders go into which IMG archive.
 IMG_ASSET_GROUPS: dict[str, tuple[str, ...]] = {
     "gta3.img": ("Anims", "Radar", "Map", "Peds", "Vegetation", "Vehicles", "Weapons"),
@@ -184,12 +188,19 @@ def require_packages(modules: tuple[str, ...] | dict[str, str]) -> None:
         )
 
 
-def copy_tree(src: Path, dst: Path) -> None:
+def copy_tree(src: Path, dst: Path, *, ignored_suffixes: tuple[str, ...] = ()) -> None:
     """Copy ``src`` into ``dst``, ignoring missing sources."""
     if not src.is_dir():
         log.debug("Skipping missing folder: %s", src)
         return
-    shutil.copytree(src, dst, dirs_exist_ok=True)
+    def ignored_entries(_directory: str, names: list[str]) -> set[str]:
+        return {
+            name for name in names
+            if name.lower() in IGNORED_PROJECT_NAMES
+            or Path(name).suffix.lower() in ignored_suffixes
+        }
+
+    shutil.copytree(src, dst, dirs_exist_ok=True, ignore=ignored_entries)
 
 
 def copy_tree_contents(src: Path, dst: Path) -> None:
@@ -199,6 +210,8 @@ def copy_tree_contents(src: Path, dst: Path) -> None:
         return
     dst.mkdir(parents=True, exist_ok=True)
     for entry in src.iterdir():
+        if entry.name.lower() in IGNORED_PROJECT_NAMES:
+            continue
         target = dst / entry.name
         if entry.is_dir():
             shutil.copytree(entry, target, dirs_exist_ok=True)
@@ -216,7 +229,7 @@ def collect_assets(folder: Path) -> list[Path]:
     for root, directories, files in os.walk(folder):
         directories.sort()
         for name in sorted(files):
-            if name.lower().endswith(IGNORED_SUFFIXES):
+            if name.lower() in IGNORED_FILENAMES or name.lower().endswith(IGNORED_SUFFIXES):
                 continue
             found.append(Path(root) / name)
     return found
@@ -236,6 +249,31 @@ def check_iso(src: Path, allow_modded: bool) -> None:
             "Put the original 'Grand Theft Auto - San Andreas (USA) (v1.03).iso' "
             "next to this script or pass --iso."
         )
+
+    # This project patches the US NTSC-U v1.03 executable. Skipping the hash
+    # check must not silently permit a different regional game executable.
+    pycdlib = require_module("pycdlib", "pycdlib")
+    iso = pycdlib.PyCdlib()
+    try:
+        iso.open(str(src))
+        try:
+            iso.get_record(iso_path="/SLUS_209.46;1")
+        except Exception as exc:
+            root_names = []
+            for record in iso.list_children(iso_path="/"):
+                if record is None or record.is_dot() or record.is_dotdot() or record.is_dir():
+                    continue
+                name = record.file_identifier().decode("ascii", "replace").split(";", 1)[0]
+                if re.match(r"^(?:SLUS|SLES|SCUS|SCES)_", name, re.IGNORECASE):
+                    root_names.append(name)
+            found = ", ".join(sorted(root_names)) or "no recognized executable"
+            raise BuildError(
+                "Unsupported GTA San Andreas disc version. This project requires the "
+                f"US NTSC-U v1.03 executable SLUS_209.46; found {found}. "
+                "--allow-modded skips only the checksum check; it cannot adapt another region."
+            ) from exc
+    finally:
+        iso.close()
 
     if allow_modded:
         log.info("      Checksum verification skipped (--allow-modded).")
@@ -286,8 +324,12 @@ def extract_iso(src: Path, dst: Path) -> None:
 
 
 def install_project_files(project: Path, build: Path) -> None:
-    for name in ("intro", "text", "data", "models"):
+    for name in ("intro", "text", "data"):
         copy_tree(project / name, build / name)
+
+    # PNG/PSD files under models/txd/vphone are source artwork; the game uses
+    # the compiled TXD dictionaries copied alongside them instead.
+    copy_tree(project / "models", build / "models", ignored_suffixes=(".png", ".psd"))
 
     for name in ("CONFIG", "SFX"):
         copy_tree(project / "audio" / name, build / "audio" / name)
@@ -403,7 +445,7 @@ def rebuild_img_archives(settings: Settings) -> None:
 
 
 def iso_path(relative: Path, *, is_file: bool) -> str:
-    """Convert a relative path into a validated ISO9660 level 1 path."""
+    """Convert a relative path into a validated ISO9660 level 2 path."""
     parts: list[str] = []
     for part in relative.parts:
         name = part.upper()
@@ -413,13 +455,13 @@ def iso_path(relative: Path, *, is_file: bool) -> str:
 
         valid = (
             ISO_NAME_RE.match(stem)
-            and 1 <= len(stem) <= 8
-            and (extension == "" or (ISO_NAME_RE.match(extension) and len(extension) <= 3))
+            and 1 <= len(stem) + (1 + len(extension) if dot else 0) <= 31
+            and (not dot or (extension and ISO_NAME_RE.match(extension)))
         )
         if not valid:
             raise BuildError(
                 f"'{part}' cannot be stored in a plain ISO9660 image. "
-                "Names must be 8.3 with A-Z, 0-9 and _ only."
+                "Names must be at most 31 characters and use A-Z, 0-9, _ and one dot."
             )
         parts.append(name)
 
@@ -438,7 +480,7 @@ def write_iso(settings: Settings) -> None:
     added = 0
     try:
         iso.new(
-            interchange_level=1,
+            interchange_level=2,
             vol_ident="GTAVLEGACY",
             joliet=None,
             rock_ridge=None,
@@ -643,7 +685,7 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "package",
         "Writing ISO",
-        "Package the build folder as an ISO9660 level 1 image.",
+        "Package the build folder as an ISO9660 level 2 image.",
         package_stage,
     ),
     Stage(

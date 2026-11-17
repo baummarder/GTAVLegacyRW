@@ -1,4 +1,6 @@
-# GTA V Legacy für PS2
+# GTA V Legacy
+
+### Los Santos. San Andreas. PlayStation 2.
 
 Ein inoffizielles Konvertierungsprojekt, das ausgewählte **Fahrzeuge, Waffen, Audio- und Grafik-Assets aus GTA V** in **GTA San Andreas für PlayStation 2** bringt. Das Python-Build-Tool überträgt die Projektdateien auf ein kompatibles San-Andreas-ISO und erstellt daraus ein neues Image.
 
@@ -6,14 +8,15 @@ Der Build läuft mit Python unter **Windows, Linux und macOS**. UltraISO und die
 
 Das fertige Image ist für Emulatoren wie PCSX2 und echte PS2-Hardware mit OPL/FreeMcBoot vorgesehen. Kompatibilität und Spielbarkeit sind nicht garantiert.
 
-> **Status: Closed Alpha.** Das Projekt ist unvollständig; rechne mit fehlenden Assets, Platzhaltern und Abstürzen.
+> **CLOSED ALPHA** · Das Projekt ist unvollständig; rechne mit fehlenden Assets, Platzhaltern und Abstürzen.
 >
 > **Dieses Repository führt die Legacy von [GTAVLegacy von Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy) weiter.** Siehe [Projekt-Historie](#projekt-historie).
 
-> **Persönliche Notiz:** Dieses ist auf absehbare Zeit mein letztes Nebenprojekt. Ich möchte meine Zeit künftig auf einige Dinge konzentrieren, die mir wichtiger sind als das Programmieren.
+**Persönliche Notiz:** Dieses ist auf absehbare Zeit mein letztes Nebenprojekt. Ich möchte meine Zeit künftig auf einige Dinge konzentrieren, die mir wichtiger sind als das Programmieren.
 
 [ISO bauen](#schnellstart) · [CLI-Referenz](#kommandozeile) · [Projekt-Historie](#projekt-historie) · [English](README.md)
 
+---
 ---
 
 ## Inhalt
@@ -104,7 +107,7 @@ MD5:  c383c015065f8060343032480928d08d
 SHA1: 66cb01a8281cc132e023a1e52afc75d1fad3fbe1
 ```
 
-Hast du eine andere (bereits gemoddete) Version, nutze `--allow-modded` oder setze `allow_modded = True` in `config.ini`. Das überspringt die Prüfsummen-Prüfung – auf eigenes Risiko.
+Wurde dein **US-NTSC-U-v1.03-ISO** modifiziert und stimmt die Prüfsumme deshalb nicht mehr, nutze `--allow-modded` oder setze `allow_modded = True` in `config.ini`. Damit wird nur die Hash-Prüfung übersprungen; PAL- und andere Regionalversionen werden dadurch nicht kompatibel.
 
 ---
 
@@ -184,7 +187,7 @@ Ohne `--output` wird der in `config.ini` eingetragene Ausgabepfad verwendet. Tes
 | `overlay` | `src/` über das entpackte ISO kopieren. |
 | `audio` | `STREAMS.7z.*`-Teile zusammenfügen und entpacken. |
 | `images` | Assets in `gta3.img` und `gta_int.img` mischen. |
-| `package` | Build-Ordner als ISO9660-Level-1-Image bauen. |
+| `package` | Build-Ordner als ISO9660-Level-2-Image bauen. |
 | `verify` | Fertiges ISO erneut öffnen und Inhalt prüfen. |
 
 ### Optionen
@@ -262,7 +265,7 @@ Das Skript schreibt `config.ini` nicht mehr zurück; der alte Abschnitt `[SAVED_
 4. **Mod-Dateien kopieren** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/` sowie die Inhalte von `overlays/`. Nicht ins ISO gehörende Altlasten (`models/gta3_1.img`, `movies/`) werden entfernt.
 5. **Audio-Streams entpacken** – alle `STREAMS.7z.*`-Teile in `src/audio/STREAMS/` werden zu `result.7z` zusammengefügt, entpackt und das Archiv gelöscht.
 6. **IMG-Archive neu bauen** – jede Datei unter `src/assets/` wird von `imgtool.py` in `gta3.img`/`gta_int.img` gemischt: vorhandene Einträge werden ersetzt, neue angehängt. Die Archive werden Sektor für Sektor neu geschrieben und müssen nie komplett in den Speicher.
-7. **ISO schreiben** – `pycdlib` erzeugt aus `build/` ein frisches ISO9660-Level-1-Image.
+7. **ISO schreiben** – `pycdlib` erzeugt aus `build/` ein frisches ISO9660-Level-2-Image. So bleiben die längeren Dateinamen der zusätzlichen Skripte und Plugins erhalten.
 8. **Ergebnis prüfen** – das ISO wird erneut geöffnet und muss `SYSTEM.CNF`, `SLUS_209.46`, `MODELS/GTA3.IMG` und `MODELS/GTA_INT.IMG` enthalten; Datei- und Ordneranzahl werden ausgegeben.
 
 Erwartete Ausgabe (grob):
@@ -303,7 +306,7 @@ Done. 8 stage(s) in 5 min 14 s.
 Hinweise zu den Formaten der Python-Implementierung:
 
 - IMG-Archive sind **VER2** (GTA San Andreas). Einträge sind auf 65535 Sektoren (~128 MiB) und 23 Zeichen Namen begrenzt, genau wie bei den Original-Tools. Verstöße brechen den Build mit klarer Meldung ab.
-- Das ISO wird als reines **ISO9660 Level 1** geschrieben: Namen müssen 8.3, Großbuchstaben, `A-Z 0-9 _` sein. Die Original-Spieldateien erfüllen das; ungewöhnliche neue Dateinamen brechen den Build mit Angabe des Pfads ab.
+- Das ISO wird als **ISO9660 Level 2** geschrieben, damit längere Skript- und Plugin-Dateinamen erhalten bleiben. Namen dürfen höchstens 31 Zeichen lang sein und `A-Z`, `0-9`, `_` sowie einen Punkt enthalten. PNG-/PSD-Arbeitsgrafiken und IDE-Metadaten kommen nicht ins Spiel-Image.
 - Das ISO wird aus den Dateiinhalten neu gebaut, nicht Byte für Byte am Original gepatcht. Die Verzeichnisreihenfolge kann daher von der Retail-Disc abweichen.
 
 ---
@@ -359,7 +362,7 @@ Das Repository ist englisch-first, damit international daran gearbeitet werden k
 | [`README.de.md`](README.de.md) ist die einzige deutsche Datei. | Sie ist eine ausdrückliche Übersetzung, nicht die Hauptdokumentation. |
 | Spieldaten behalten ihre Originalnamen (`HANDLING.CFG`, `VEHICLES.IDE`, `GTA3.IMG`, …). | Die Engine sucht sie über den Namen; Umbenennen bricht das Spiel. |
 | Konvertierte Modelle und Texturen behalten ihre Asset-Namen (`stretch.dff`, `comet.txd`, …). | IDE-Dateien und Skripte referenzieren sie über den Namen. |
-| Für alles in `build/` gelten weiterhin die ISO9660-Level-1-Regeln. | 8.3-Namen, Großbuchstaben, `A-Z 0-9 _`. |
+| Das fertige ISO nutzt ISO9660 Level 2. | Dateinamen bis 31 Zeichen, Großbuchstaben, `A-Z 0-9 _` und ein Punkt. |
 
 Nicht-englische Legacy-Ordner wurden übersetzt: `Instalador de Musicas` → `music-installer`, `legalize/legalize/falas` → `voices`, `legalize/legalize/musicas` → `music`; die russischen Ordner unter `src/assets/Cars to convert/` sind jetzt ebenfalls Englisch. Auch die fremdsprachigen Readmes in den konvertierten Asset-Paketen wurden übersetzt.
 
@@ -374,7 +377,7 @@ Nicht-englische Legacy-Ordner wurden übersetzt: `Instalador de Musicas` → `mu
    src/assets/Vehicles/Cars/MeinAuto/mein_auto.dff
    src/assets/Vehicles/Cars/MeinAuto/mein_auto.txd
    ```
-2. Der Build mischt den kompletten Ordner rekursiv in `gta3.img`. Dateien mit den Endungen `.txt`, `.cfg`, `.ide`, `.dat` werden dabei **ignoriert** – gut für Notizen.
+2. Der Build mischt den kompletten Ordner rekursiv in `gta3.img`. Dateien mit den Endungen `.txt`, `.cfg`, `.ide`, `.dat` sowie typische Betriebssystem-Metadaten wie `desktop.ini` werden **ignoriert** – praktisch für Notizen und Windows-Ordner.
 3. Einträge in `src/data/VEHICLES.IDE`, `HANDLING.CFG`, `CARCOLS.DAT`, `CARMODS.DAT` usw. ergänzen, sonst ist das Modell im Spiel nicht nutzbar.
 4. Textur-/Modellnamen müssen zur IDE-Datei passen.
 
@@ -423,7 +426,7 @@ Fehlt der Ordner komplett, warnt der Build und läuft ohne eigenes Audio weiter.
 | Prüfsummen-Fehler | Falsche ISO-Version. Nur NTSC-U v1.03 hat die erwarteten Hashes; sonst `--allow-modded`. |
 | `gta3.img` nicht gefunden | Die ISO-Extraktion ist unvollständig – `build/` löschen und neu bauen. |
 | Alte Assets im ISO | `reuse_build = True` oder `--reuse-build` war aktiv. Mit `--clean` bauen. |
-| `... cannot be stored in a plain ISO9660 image` | Eine Datei in `build/` ist nicht 8.3/Großbuchstaben. In `src/` umbenennen. |
+| `... cannot be stored in a plain ISO9660 image` | Ein Name in `build/` ist länger als 31 Zeichen oder enthält ungültige Zeichen. In `src/` umbenennen. |
 | `Entry name ... is N characters long` | IMG-Eintragsnamen sind auf 23 Zeichen begrenzt. |
 | `needs N sectors, the format only allows 65535` | Eine Datei ist größer als ~128 MiB und passt nicht in ein VER2-Archiv. |
 | Hoher Speicherbedarf | Die 7z-Teile werden als ein `result.7z` in `build/` zwischengespeichert; genug freien Platz einplanen. |

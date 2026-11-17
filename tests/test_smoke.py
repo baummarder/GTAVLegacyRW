@@ -117,6 +117,7 @@ def make_fixture(work: Path) -> tuple[Path, Path]:
     (project / "models" / "gta_int.img").write_bytes(interior_source.read_bytes())
     (project / "data").mkdir()
     (project / "data" / "HANDLING.CFG").write_bytes(b"patched-handling")
+    (project / "data" / "OTHER_SCRIPTS.SC").write_text("level two filename", encoding="ascii")
 
     vehicle = project / "assets" / "Vehicles" / "Cars" / "Landstal"
     vehicle.mkdir(parents=True)
@@ -214,6 +215,7 @@ class BuildTest(unittest.TestCase):
                 root = iso_children(iso)
                 self.assertIn("SYSTEM.CNF;1", root)
                 self.assertNotIn("MOVIES", root)
+                iso.get_record(iso_path="/DATA/OTHER_SCRIPTS.SC;1")
 
                 extracted = work / "check"
                 extracted.mkdir()
@@ -273,6 +275,19 @@ class StageTest(unittest.TestCase):
             buildiso.select_stages(["nope"])
 
 
+class AssetCollectionTest(unittest.TestCase):
+    def test_ignores_documentation_and_os_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            assets = Path(temporary)
+            for name in ("model.dff", "desktop.ini", "thumbs.db", ".DS_Store", "notes.txt"):
+                (assets / name).write_bytes(b"asset")
+
+            self.assertEqual(
+                [path.name for path in buildiso.collect_assets(assets)],
+                ["model.dff"],
+            )
+
+
 class CliTest(unittest.TestCase):
     def setUp(self) -> None:
         logging.disable(logging.CRITICAL)
@@ -308,7 +323,7 @@ class CliTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary)
             original_iso = work / "game.iso"
-            make_iso(original_iso, {"SYSTEM.CNF": b"boot"})
+            make_iso(original_iso, {"SYSTEM.CNF": b"boot", "SLUS_209.46": b"fake-elf"})
 
             code = build.main(
                 [
@@ -323,6 +338,28 @@ class CliTest(unittest.TestCase):
             )
 
             self.assertEqual(code, 0)
+
+    def test_check_rejects_other_region_even_if_hash_check_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            original_iso = work / "pal-game.iso"
+            make_iso(original_iso, {"SYSTEM.CNF": b"BOOT2 = cdrom0:\\SLES_529.27;1\r\n", "SLES_529.27": b"fake-elf"})
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = build.main(
+                    [
+                        "check",
+                        "--config", str(ROOT / "config.ini"),
+                        "--iso", str(original_iso),
+                        "--project-dir", str(ROOT / "src"),
+                        "--build-dir", str(work / "build"),
+                        "--output", str(work / "out.iso"),
+                        "--allow-modded",
+                    ]
+                )
+
+            self.assertEqual(code, 1)
+            self.assertFalse((work / "build").exists())
 
     def test_wizard_build(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -365,9 +402,15 @@ class IsoPathTest(unittest.TestCase):
         self.assertEqual(buildiso.iso_path(Path("MOVIES"), is_file=False), "/MOVIES")
 
     def test_invalid_names(self) -> None:
-        for name in ("DATA/TOOLONGNAME.TXT", "DATA/BAD-NAME.CFG", "DATA/NAME.TOOLONG"):
+        for name in ("DATA/" + "A" * 32, "DATA/BAD-NAME.CFG", "DATA/NAME.BAD-NAME"):
             with self.assertRaises(buildiso.BuildError):
                 buildiso.iso_path(Path(name), is_file=True)
+
+    def test_level_two_names(self) -> None:
+        self.assertEqual(
+            buildiso.iso_path(Path("DATA/SCRIPT/OTHER_SCRIPTS.SC"), is_file=True),
+            "/DATA/SCRIPT/OTHER_SCRIPTS.SC;1",
+        )
 
 
 if __name__ == "__main__":

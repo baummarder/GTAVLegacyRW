@@ -1,4 +1,6 @@
-# GTA V Legacy for PS2
+# GTA V Legacy
+
+### Los Santos energy. San Andreas streets. PlayStation 2.
 
 An unofficial conversion project bringing selected **GTA V vehicles, weapons, audio and visual assets** into **GTA San Andreas for PlayStation 2**. The Python build tool applies the project files to a compatible San Andreas ISO and creates a new image.
 
@@ -6,14 +8,15 @@ The build runs on **Windows, Linux and macOS** with Python; it does not require 
 
 The output is intended for emulators such as PCSX2 and real PS2 hardware using OPL/FreeMcBoot. Compatibility and gameplay are not guaranteed.
 
-> **Status: Closed Alpha.** The project is incomplete; expect missing assets, placeholders and crashes.
+> **CLOSED ALPHA** · The project is incomplete; expect missing assets, placeholders and crashes.
 >
 > **This repository continues the legacy of [GTAVLegacy by Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy).** See [Project lineage](#project-lineage).
 
-> **Maintainer note:** This is my last side project for the foreseeable future. I’m focusing my time on a few priorities that matter more to me than programming.
+**A personal note:** This is my last side project for the foreseeable future. I’m focusing my time on a few priorities that matter more to me than programming.
 
 [Build your ISO](#quick-start) · [CLI reference](#command-line) · [Project lineage](#project-lineage) · [Deutsch](README.de.md)
 
+---
 ---
 
 ## Contents
@@ -104,7 +107,7 @@ MD5:  c383c015065f8060343032480928d08d
 SHA1: 66cb01a8281cc132e023a1e52afc75d1fad3fbe1
 ```
 
-If you have a different (already modded) version, pass `--allow-modded` or set `allow_modded = True` in `config.ini`. That skips the checksum verification – at your own risk.
+If your **US NTSC-U v1.03** ISO has been modified and its checksum no longer matches, pass `--allow-modded` or set `allow_modded = True` in `config.ini`. This skips the hash check only; it does not make PAL or another regional version compatible.
 
 ---
 
@@ -184,7 +187,7 @@ The finished image uses the output path from `config.ini` unless you pass `--out
 | `overlay` | Overlay `src/` onto the extracted ISO. |
 | `audio` | Join and extract the `STREAMS.7z.*` parts. |
 | `images` | Merge the assets into `gta3.img` and `gta_int.img`. |
-| `package` | Package the build folder as an ISO9660 level 1 image. |
+| `package` | Package the build folder as an ISO9660 level 2 image. |
 | `verify` | Reopen the finished ISO and check its contents. |
 
 ### Options
@@ -262,7 +265,7 @@ The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is 
 4. **Copy mod files** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/`, plus the contents of `overlays/`. Stale files that must not ship (`models/gta3_1.img`, `movies/`) are removed.
 5. **Unpack audio streams** – all `STREAMS.7z.*` parts in `src/audio/STREAMS/` are joined into `result.7z`, extracted, and the archive is deleted.
 6. **Rebuild the IMG archives** – every file under `src/assets/` is merged into `gta3.img` / `gta_int.img` by `imgtool.py`: entries that already exist are replaced, new ones are appended. The archives are rewritten sector by sector, so they never have to fit into memory.
-7. **Write the ISO** – `pycdlib` creates a fresh ISO9660 level 1 image from `build/`.
+7. **Write the ISO** – `pycdlib` creates a fresh ISO9660 level 2 image from `build/`, retaining the longer names used by added scripts and plugins.
 8. **Verify the output** – the ISO is reopened and must contain `SYSTEM.CNF`, `SLUS_209.46`, `MODELS/GTA3.IMG` and `MODELS/GTA_INT.IMG`; the file and folder counts are printed.
 
 Expected output (roughly):
@@ -303,7 +306,7 @@ Done. 8 stage(s) in 5 min 14 s.
 Notes on the formats used by the Python implementation:
 
 - IMG archives are **VER2** (GTA San Andreas). Entries are limited to 65535 sectors (~128 MiB) and 23 characters per name, exactly like the original tools. Violations abort the build with a clear message.
-- The ISO is written as plain **ISO9660 level 1**: names must be 8.3, uppercase, `A-Z 0-9 _`. The original game files already satisfy this; unusual new filenames abort the build with the offending path.
+- The ISO is written as plain **ISO9660 Level 2** to retain longer script and plugin filenames. Names are limited to 31 characters and `A-Z`, `0-9`, `_` and one dot. Raw PNG/PSD editor artwork and IDE metadata are left out of the game image.
 - The ISO is rebuilt from the file contents, not by patching the original image byte by byte. The directory order may therefore differ from the retail disc.
 
 ---
@@ -359,7 +362,7 @@ The repository is English-first so that it can be worked on internationally:
 | [`README.de.md`](README.de.md) is the only German file. | It is an explicit translation, not the primary documentation. |
 | Game data keeps its original names (`HANDLING.CFG`, `VEHICLES.IDE`, `GTA3.IMG`, …). | The engine looks these up by name; renaming them breaks the game. |
 | Converted models and textures keep their asset names (`stretch.dff`, `comet.txd`, …). | IDE files and scripts reference them by name. |
-| Everything inside `build/` must still follow ISO9660 level 1. | 8.3 names, uppercase, `A-Z 0-9 _`. |
+| The finished image uses ISO9660 Level 2. | Names up to 31 characters, uppercase, `A-Z 0-9 _` and one dot. |
 
 Non-English legacy folders have been translated: `Instalador de Musicas` → `music-installer`, `legalize/legalize/falas` → `voices`, `legalize/legalize/musicas` → `music`, and the Russian folders under `src/assets/Cars to convert/` are English now as well. The non-English readmes shipped with the converted asset packs were translated too.
 
@@ -374,7 +377,7 @@ Non-English legacy folders have been translated: `Instalador de Musicas` → `mu
    src/assets/Vehicles/Cars/MyCar/my_car.dff
    src/assets/Vehicles/Cars/MyCar/my_car.txd
    ```
-2. The build merges the whole folder recursively into `gta3.img`. Files ending in `.txt`, `.cfg`, `.ide`, `.dat` are **ignored** – handy for notes.
+2. The build merges the whole folder recursively into `gta3.img`. Files ending in `.txt`, `.cfg`, `.ide`, `.dat`, plus common OS metadata such as `desktop.ini`, are **ignored** – handy for notes and Windows folders.
 3. Add entries to `src/data/VEHICLES.IDE`, `HANDLING.CFG`, `CARCOLS.DAT`, `CARMODS.DAT` etc., otherwise the model is unusable in-game.
 4. Texture/model names must match the IDE file.
 
@@ -423,7 +426,7 @@ If the folder is missing entirely, the build warns and continues without custom 
 | Checksum error | Wrong ISO version. Only NTSC-U v1.03 has the expected hashes; otherwise use `--allow-modded`. |
 | `gta3.img` not found | The ISO extraction is incomplete – delete `build/` and rebuild. |
 | Stale assets in the ISO | `reuse_build = True` or `--reuse-build` was used. Run with `--clean`. |
-| `... cannot be stored in a plain ISO9660 image` | A file in `build/` is not 8.3/uppercase. Rename it in `src/`. |
+| `... cannot be stored in a plain ISO9660 image` | A name in `build/` is longer than 31 characters or contains unsupported characters. Rename it in `src/`. |
 | `Entry name ... is N characters long` | IMG entry names are limited to 23 characters. |
 | `needs N sectors, the format only allows 65535` | A single file is larger than ~128 MiB and cannot be stored in a VER2 archive. |
 | Huge memory usage | The 7z parts are joined as one `result.7z` inside `build/`; use a machine with enough free disk space. |
