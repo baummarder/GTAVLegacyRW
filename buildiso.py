@@ -3,7 +3,8 @@
 
 Overlays the mod content from ``src/`` onto an unmodified GTA San Andreas
 (PS2, NTSC-U v1.03) ISO, rebuilds the ``.img`` archives and writes a new,
-patched ISO.
+patched ISO. Everything is done in pure Python, so the build runs on Windows,
+Linux and macOS without UltraISO or other external tools.
 
 Examples
 --------
@@ -26,14 +27,15 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
+import imgtool
+
 APP_NAME = "GTA V Legacy builder"
-APP_VERSION = "0.2"
+APP_VERSION = "0.3"
 
 DEFAULT_CONFIG = "config.ini"
 BUF_SIZE = 65536
@@ -45,7 +47,15 @@ EXPECTED_SHA1 = "66cb01a8281cc132e023a1e52afc75d1fad3fbe1"
 STREAM_PART_RE = re.compile(r"^STREAMS\.7z\.(\d+)$", re.IGNORECASE)
 
 #: Files that are documentation, not game assets.
-IMG_IGNORE = ("*.txt", "*.cfg", "*.ide", "*.dat")
+IGNORED_SUFFIXES = (".txt", ".cfg", ".ide", ".dat")
+
+#: Which asset folders go into which IMG archive.
+IMG_ASSET_GROUPS: dict[str, tuple[str, ...]] = {
+    "gta3.img": ("Anims", "Radar", "Map", "Peds", "Vegetation", "Vehicles", "Weapons"),
+    "gta_int.img": ("Interiors",),
+}
+
+ISO_NAME_RE = re.compile(r"^[A-Z0-9_]+$")
 
 log = logging.getLogger("gtavlegacy")
 
@@ -62,8 +72,6 @@ class Settings:
     output: Path
     project: Path
     build: Path
-    ultraiso_dir: Path
-    imgconsole_dir: Path
     allow_modded: bool = False
     reuse_build: bool = False
 
@@ -140,27 +148,20 @@ def copy_tree_contents(src: Path, dst: Path) -> None:
             shutil.copy2(entry, target)
 
 
-def copy_asset_tree(src: Path, dst: Path) -> None:
-    """Copy game assets, skipping documentation files."""
-    if not src.is_dir():
-        log.debug("Skipping missing asset folder: %s", src)
-        return
-    shutil.copytree(
-        src,
-        dst,
-        dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns(*IMG_IGNORE),
-    )
+def collect_assets(folder: Path) -> list[Path]:
+    """Return all asset files below ``folder``, skipping documentation."""
+    if not folder.is_dir():
+        log.debug("Skipping missing asset folder: %s", folder)
+        return []
 
-
-def copy_asset_subfolders(src: Path, dst: Path) -> None:
-    """Copy every subfolder of ``src`` into ``dst`` (one level deep)."""
-    if not src.is_dir():
-        log.debug("Skipping missing asset category: %s", src)
-        return
-    for entry in sorted(src.iterdir()):
-        if entry.is_dir():
-            copy_asset_tree(entry, dst)
+    found: list[Path] = []
+    for root, directories, files in os.walk(folder):
+        directories.sort()
+        for name in sorted(files):
+            if name.lower().endswith(IGNORED_SUFFIXES):
+                continue
+            found.append(Path(root) / name)
+    return found
 
 
 # --------------------------------------------------------------------------- #
@@ -298,109 +299,113 @@ def unpack_streams(streams_dir: Path, target_dir: Path) -> None:
         archive.unlink(missing_ok=True)
 
 
-def rebuild_imgs(settings: Settings) -> None:
-    img_dir = settings.imgconsole_dir
-    console = img_dir / "fastman92ImgConsole32.exe"
-    if not console.is_file():
-        raise BuildError(f"fastman92 IMG Console not found: {console}")
+def rebuild_img_archives(settings: Settings) -> None:
+    """Merge the assets from ``src/assets`` into the extracted IMG archives."""
+    models = settings.build / "models"
 
-    build_script = settings.project / "assets" / "build.txt"
-    if not build_script.is_file():
-        raise BuildError(f"IMG Console script not found: {build_script}")
-
-    images = ("gta3.img", "gta_int.img")
-    for name in images:
-        source = settings.build / "models" / name
-        if not source.is_file():
+    for archive_name, categories in IMG_ASSET_GROUPS.items():
+        archive = models / archive_name
+        if not archive.is_file():
             raise BuildError(
-                f"Missing {name} in {settings.build / 'models'}.\n"
+                f"Missing {archive_name} in {models}.\n"
                 "The ISO extraction looks incomplete - delete the build folder and rebuild."
             )
-        shutil.copy2(source, img_dir / name)
 
-    shutil.copy2(build_script, img_dir / "build.txt")
+        files: list[Path] = []
+        for category in categories:
+            files.extend(collect_assets(settings.project / "assets" / category))
 
-    staging = {"gta3": img_dir / "gta3", "gta_int": img_dir / "gta_int"}
-    for folder in staging.values():
-        if folder.exists():
-            shutil.rmtree(folder)
-        folder.mkdir()
+        try:
+            existing = {
+                entry.name.upper() for entry in imgtool.read_directory(archive)
+            }
+            replacements: dict[str, Path] = {}
+            additions: list[Path] = []
+            for path in files:
+                key = path.name.upper()
+                if key in existing:
+                    replacements[key] = path
+                else:
+                    additions.append(path)
 
-    assets = settings.project / "assets"
-    copy_asset_tree(assets / "Anims", staging["gta3"])
-    copy_asset_tree(assets / "Radar", staging["gta3"])
-    for category in ("Map", "Peds", "Vegetation", "Vehicles", "Weapons"):
-        copy_asset_subfolders(assets / category, staging["gta3"])
-    copy_asset_tree(assets / "Interiors", staging["gta_int"])
+            temporary = archive.with_name(archive.name + ".new")
+            result = imgtool.rebuild(archive, temporary, replacements, additions)
+            os.replace(temporary, archive)
+        except imgtool.ImgError as exc:
+            raise BuildError(f"Could not rebuild {archive_name}: {exc}") from exc
 
-    log.info("      Running fastman92 IMG Console ...")
-    result = subprocess.run(
-        [str(console), "-script", str(img_dir / "build.txt")],
-        cwd=str(img_dir),
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        details = (result.stdout or "") + (result.stderr or "")
-        raise BuildError(
-            "fastman92 IMG Console failed "
-            f"(exit code {result.returncode}).\n{details.strip()}"
+        log.info(
+            "      %s: %d entries (%d replaced, %d added, %s)",
+            archive_name,
+            result.total,
+            result.replaced,
+            result.added,
+            human_size(result.size),
         )
-    log.debug("      IMG Console output:\n%s", (result.stdout or "").strip())
 
-    for name in images:
-        if not (img_dir / name).is_file():
-            raise BuildError(f"IMG Console did not produce {name}.")
-        shutil.copy2(img_dir / name, settings.build / "models" / name)
-        (img_dir / name).unlink()
 
-    for folder in staging.values():
-        shutil.rmtree(folder, ignore_errors=True)
+def iso_path(relative: Path, *, is_file: bool) -> str:
+    """Convert a relative path into a validated ISO9660 level 1 path."""
+    parts: list[str] = []
+    for part in relative.parts:
+        name = part.upper()
+        stem, dot, extension = name.rpartition(".")
+        if not dot:
+            stem, extension = name, ""
+
+        valid = (
+            ISO_NAME_RE.match(stem)
+            and 1 <= len(stem) <= 8
+            and (extension == "" or (ISO_NAME_RE.match(extension) and len(extension) <= 3))
+        )
+        if not valid:
+            raise BuildError(
+                f"'{part}' cannot be stored in a plain ISO9660 image. "
+                "Names must be 8.3 with A-Z, 0-9 and _ only."
+            )
+        parts.append(name)
+
+    path = "/" + "/".join(parts)
+    return f"{path};1" if is_file else path
 
 
 def write_iso(settings: Settings) -> None:
-    ultraiso = settings.ultraiso_dir / "UltraISO.exe"
-    if not ultraiso.is_file():
-        raise BuildError(
-            f"UltraISO not found: {ultraiso}\n"
-            "Extract UltraISO into ./UltraISO or set uiso_path / --ultraiso-dir."
-        )
+    pycdlib = require_module("pycdlib", "pycdlib")
 
     if settings.output.exists():
         settings.output.unlink()
     settings.output.parent.mkdir(parents=True, exist_ok=True)
 
-    command = [
-        str(ultraiso),
-        "-input", str(settings.iso),
-        "-rmdir", "/MODELS/GTA3_1.IMG",
-        "-rmdir", "/MOVIES",
-        "-directory", str(settings.build) + os.sep,
-        "-output", str(settings.output),
-    ]
-    log.debug("      %s", command)
+    iso = pycdlib.PyCdlib()
+    added = 0
+    try:
+        iso.new(
+            interchange_level=1,
+            vol_ident="GTAVLEGACY",
+            joliet=None,
+            rock_ridge=None,
+        )
 
-    result = subprocess.run(
-        command,
-        cwd=str(settings.ultraiso_dir),
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        details = (result.stdout or "") + (result.stderr or "")
-        log.warning("      UltraISO exited with code %s: %s", result.returncode, details.strip())
+        for root, directories, files in os.walk(settings.build):
+            directories.sort()
+            relative_root = Path(root).relative_to(settings.build)
 
-    # UltraISO occasionally finishes writing a moment after it exits.
-    for _ in range(30):
-        if settings.output.is_file() and settings.output.stat().st_size > 0:
-            return
-        time.sleep(1)
+            for directory in directories:
+                iso.add_directory(iso_path=iso_path(relative_root / directory, is_file=False))
 
-    raise BuildError(
-        f"UltraISO did not produce {settings.output}.\n"
-        "Check that UltraISO is a full version (not the trial), that it runs, "
-        "and that the build folder is complete."
-    )
+            for name in sorted(files):
+                local = Path(root) / name
+                iso.add_file(str(local), iso_path=iso_path(relative_root / name, is_file=True))
+                added += 1
+                log.debug("      + %s", relative_root / name)
+
+        log.info("      Packaging %d files ...", added)
+        iso.write(str(settings.output))
+    finally:
+        iso.close()
+
+    if not settings.output.is_file() or settings.output.stat().st_size == 0:
+        raise BuildError(f"Writing the ISO failed: {settings.output} is missing or empty.")
 
 
 # --------------------------------------------------------------------------- #
@@ -442,10 +447,6 @@ def load_settings(args: argparse.Namespace) -> Settings:
 
     project = args.project_dir or resolve_path(value("project_path", "./src"))
     build = args.build_dir or resolve_path(value("build_path", "./build"))
-    ultraiso = args.ultraiso_dir or resolve_path(value("uiso_path", "$cwd/UltraISO"))
-    imgconsole = args.imgconsole_dir or resolve_path(
-        value("imgconsole_path", "./IMGconsole_32-bit")
-    )
 
     reuse_build = (args.reuse_build or flag("reuse_build")) and not args.clean
 
@@ -454,8 +455,6 @@ def load_settings(args: argparse.Namespace) -> Settings:
         output=output,
         project=project,
         build=build,
-        ultraiso_dir=ultraiso,
-        imgconsole_dir=imgconsole,
         allow_modded=args.allow_modded or flag("allow_modded"),
         reuse_build=reuse_build,
     )
@@ -473,9 +472,6 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, help="Path of the ISO to write")
     parser.add_argument("--project-dir", type=Path, help="Folder containing the mod files")
     parser.add_argument("--build-dir", type=Path, help="Working folder for the extracted ISO")
-    parser.add_argument("--ultraiso-dir", type=Path, help="Folder containing UltraISO.exe")
-    parser.add_argument("--imgconsole-dir", type=Path,
-                        help="Folder containing fastman92ImgConsole32.exe")
     parser.add_argument("--allow-modded", action="store_true",
                         help="Skip the ISO checksum verification")
 
@@ -523,7 +519,7 @@ def run(settings: Settings) -> None:
     )
 
     log.info("[6/8] Rebuilding IMG archives ...")
-    rebuild_imgs(settings)
+    rebuild_img_archives(settings)
 
     log.info("[7/8] Writing ISO ...")
     write_iso(settings)
