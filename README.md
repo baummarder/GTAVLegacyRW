@@ -1,16 +1,18 @@
-# GTA V Legacy (PS2)
+# GTA V Legacy for PS2
 
-A build tool and asset pack that brings **GTA V content into GTA San Andreas on the PlayStation 2**. Instead of writing a new engine, it takes an existing **GTA San Andreas (NTSC-U, v1.03) ISO**, unpacks it, overlays it with assets converted from GTA V, and repacks it into a new ISO.
+An unofficial conversion project bringing selected **GTA V vehicles, weapons, audio and visual assets** into **GTA San Andreas for PlayStation 2**. The Python build tool applies the project files to a compatible San Andreas ISO and creates a new image.
 
-Everything runs in **pure Python** – no UltraISO, no Windows-only helper tools. The build works on Windows, Linux and macOS.
+The build runs on **Windows, Linux and macOS** with Python; it does not require UltraISO or the legacy Windows-only tools.
 
-The goal is an ISO for real PS2 hardware (for example, through FreeMcBoot/OPL) and emulators such as PCSX2. This is an unfinished alpha, so compatibility and gameplay are not guaranteed.
+The output is intended for emulators such as PCSX2 and real PS2 hardware using OPL/FreeMcBoot. Compatibility and gameplay are not guaranteed.
 
-> **Status:** "Closed Alpha" – a hobby/fan project in active, unfinished development. Expect missing assets, placeholders and crashes.
+> **Status: Closed Alpha.** The project is incomplete; expect missing assets, placeholders and crashes.
 >
 > **This repository continues the legacy of [GTAVLegacy by Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy).** See [Project lineage](#project-lineage).
 
-*German version: [README.de.md](README.de.md)*
+> **Maintainer note:** This is my last side project for the foreseeable future. I’m focusing my time on a few priorities that matter more to me than programming.
+
+[Build your ISO](#quick-start) · [CLI reference](#command-line) · [Project lineage](#project-lineage) · [Deutsch](README.de.md)
 
 ---
 

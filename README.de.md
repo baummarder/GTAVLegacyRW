@@ -1,16 +1,18 @@
-# GTA V Legacy (PS2)
+# GTA V Legacy für PS2
 
-Ein Build-Tool und Asset-Paket, das **GTA-V-Inhalte in GTA San Andreas für die PlayStation 2** bringt. Statt eine eigene Engine zu schreiben, wird ein bestehendes **GTA San Andreas (NTSC-U, v1.03) ISO** entpackt, mit aus GTA V konvertierten Assets überschrieben und anschließend als neues ISO wieder zusammengebaut.
+Ein inoffizielles Konvertierungsprojekt, das ausgewählte **Fahrzeuge, Waffen, Audio- und Grafik-Assets aus GTA V** in **GTA San Andreas für PlayStation 2** bringt. Das Python-Build-Tool überträgt die Projektdateien auf ein kompatibles San-Andreas-ISO und erstellt daraus ein neues Image.
 
-Alles läuft in **reinem Python** – kein UltraISO, keine Windows-only-Hilfsprogramme. Der Build funktioniert unter Windows, Linux und macOS.
+Der Build läuft mit Python unter **Windows, Linux und macOS**. UltraISO und die alten Windows-Hilfsprogramme werden dafür nicht benötigt.
 
-Ziel ist ein ISO für echte PS2-Hardware (z. B. via FreeMcBoot/OPL) und Emulatoren wie PCSX2. Das Projekt ist eine unfertige Alpha; Kompatibilität und Spielbarkeit sind nicht garantiert.
+Das fertige Image ist für Emulatoren wie PCSX2 und echte PS2-Hardware mit OPL/FreeMcBoot vorgesehen. Kompatibilität und Spielbarkeit sind nicht garantiert.
 
-> **Status:** „Closed Alpha" – ein Hobby-/Fanprojekt in aktiver, unfertiger Entwicklung. Erwarte fehlende Assets, Platzhalter und Abstürze.
+> **Status: Closed Alpha.** Das Projekt ist unvollständig; rechne mit fehlenden Assets, Platzhaltern und Abstürzen.
 >
 > **Dieses Repository führt die Legacy von [GTAVLegacy von Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy) weiter.** Siehe [Projekt-Historie](#projekt-historie).
 
-*Englische Version: [README.md](README.md)*
+> **Persönliche Notiz:** Dieses ist auf absehbare Zeit mein letztes Nebenprojekt. Ich möchte meine Zeit künftig auf einige Dinge konzentrieren, die mir wichtiger sind als das Programmieren.
+
+[ISO bauen](#schnellstart) · [CLI-Referenz](#kommandozeile) · [Projekt-Historie](#projekt-historie) · [English](README.md)
 
 ---
 
