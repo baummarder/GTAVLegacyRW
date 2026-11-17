@@ -31,4 +31,4 @@ if grep -qi '^Co-authored-by: DeepSeek' "$msg_file"; then
     exit 0
 fi
 
-printf '\nCo-authored-by: DeepSeek V4.1 Flash <noreply@deepseek.com>\nCo-authored-by: OpenCode <noreply@opencode.ai>\n' >> "$msg_file"
+printf '\nCo-authored-by: DeepSeek <ai@deepseek.com>\nCo-authored-by: Opencode Agent <agent@opencode.local>\n' >> "$msg_file"

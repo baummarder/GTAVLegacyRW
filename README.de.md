@@ -391,8 +391,8 @@ Der Smoke-Test erzeugt ein Miniatur-ISO mit derselben Struktur, führt den kompl
 Diese Weiterführung entsteht mit KI-Unterstützung. Ein `prepare-commit-msg`-Hook in `.githooks/` hängt die Co-Author-Trailer an jeden Commit:
 
 ```
-Co-authored-by: DeepSeek V4.1 Flash <noreply@deepseek.com>
-Co-authored-by: OpenCode <noreply@opencode.ai>
+Co-authored-by: DeepSeek <ai@deepseek.com>
+Co-authored-by: Opencode Agent <agent@opencode.local>
 ```
 
 Einmal pro Clone aktivieren:
@@ -429,4 +429,4 @@ python buildiso.py --reuse-build   # vorhandenes build/ nicht neu entpacken
 - **fastman92** – IMG Console (im Original-Build genutzt, jetzt durch `imgtool.py` ersetzt)
 - **UltraISO** – ISO-Erstellung (im Original-Build genutzt, jetzt durch `pycdlib` ersetzt)
 - **pycdlib**, **py7zr** – Python-Bibliotheken für ISO- und 7z-Verarbeitung
-- **DeepSeek V4.1 Flash** und **OpenCode** – Dokumentation, Build-Tooling und Wartung dieser Weiterführung
+- **DeepSeek** und **Opencode Agent** – Dokumentation, Build-Tooling und Wartung dieser Weiterführung
