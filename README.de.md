@@ -4,7 +4,7 @@ Ein Build-Tool und Asset-Paket, das **GTA-V-Inhalte in GTA San Andreas für die 
 
 Alles läuft in **reinem Python** – kein UltraISO, keine Windows-only-Hilfsprogramme. Der Build funktioniert unter Windows, Linux und macOS.
 
-Das Ergebnis ist ein spielbares ISO für echte PS2-Hardware (z. B. via FreeMcBoot/OPL) oder Emulatoren wie PCSX2.
+Ziel ist ein ISO für echte PS2-Hardware (z. B. via FreeMcBoot/OPL) und Emulatoren wie PCSX2. Das Projekt ist eine unfertige Alpha; Kompatibilität und Spielbarkeit sind nicht garantiert.
 
 > **Status:** „Closed Alpha" – ein Hobby-/Fanprojekt in aktiver, unfertiger Entwicklung. Erwarte fehlende Assets, Platzhalter und Abstürze.
 >
@@ -108,36 +108,52 @@ Hast du eine andere (bereits gemoddete) Version, nutze `--allow-modded` oder set
 
 ## Schnellstart
 
-```bash
-# 1. Abhängigkeiten installieren (oder vom Tool installieren lassen:
-#    python build.py deps --install-deps)
-pip install -r requirements.txt
+### 1. Python-Abhängigkeiten installieren
 
-# 2. Interaktiven Assistenten starten (ISO per Drag & Drop möglich)
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 2. Original-ISO bereitstellen
+
+Verwende dein legal erworbenes **GTA San Andreas (USA, NTSC-U v1.03) für PS2**. Lege es mit dem in `config.ini` angegebenen Standardnamen in den Projektordner oder übergib den Pfad später mit `--iso`.
+
+Vor Änderungen am Build-Ordner prüft das Tool standardmäßig MD5 und SHA1. Andere Versionen werden zunächst nicht unterstützt.
+
+### 3. Einrichtung prüfen und bauen
+
+```bash
+python build.py check
 python build.py
-
-# Oder nicht-interaktiv mit explizitem ISO:
-python build.py --iso "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
 ```
 
-Der Assistent führt durch ISO, Ausgabename, Prüfsumme und Build-Optionen.
+In einem Terminal startet `python build.py` den interaktiven Assistenten. Er fragt nach ISO und Ausgabepfad, zeigt die gewählten Optionen und beginnt nach deiner Bestätigung. Den ISO-Pfad kannst du beim Assistenten per Drag & Drop ins Terminal einfügen.
 
-Das Tool sagt dir vorher, was fehlt:
+Für einen Build ohne Rückfragen gib den ISO-Pfad direkt an:
 
 ```bash
-python build.py check      # Umgebung, Pakete, freier Speicher, ISO-Prüfsumme
-python build.py deps       # fehlende Python-Pakete auflisten
-python build.py info       # aufgelöste Pfade und Einstellungen
-python build.py stages     # alle Build-Stages auflisten
+python build.py --iso "D:/Games/Grand Theft Auto - San Andreas.iso" --output "D:/Games/GTA V Legacy.iso"
 ```
 
-Unter Windows reicht der PowerShell-Wrapper alle Argumente weiter:
+Unter Windows gibt es dafür auch den PowerShell-Wrapper:
 
 ```powershell
-.\build.ps1 --output "GTA V Legacy.iso" -v
+.\build.ps1 --iso "D:\Games\Grand Theft Auto - San Andreas.iso" --output "D:\Games\GTA V Legacy.iso"
 ```
 
-Das fertige Image heißt laut `config.ini` (Standard `GTA V Legacy Closed Alpha.iso`). Testen kannst du es in **PCSX2** oder auf einer PS2 (OPL/FreeMcBoot).
+Eine vorhandene Ausgabedatei wird überschrieben. Ein normaler Build erstellt auch den Arbeitsordner `build/` neu. Verwende `--reuse-build` nur, wenn du die dort entpackten Dateien bewusst wiederverwenden möchtest.
+
+### Nützliche erste Befehle
+
+```bash
+python build.py --help       # alle Befehle und Optionen anzeigen
+python build.py deps         # Python-Pakete prüfen
+python build.py info         # Pfade, Stream-Teile und Paketstatus anzeigen
+python build.py stages       # Build-Stages auflisten
+python build.py --dry-run    # Stage-Plan zeigen; prüft das ISO nicht
+```
+
+Ohne `--output` wird der in `config.ini` eingetragene Ausgabepfad verwendet. Teste das fertige Image in **PCSX2** oder auf einer PS2 mit OPL/FreeMcBoot.
 
 ---
 
@@ -196,8 +212,8 @@ Beispiele:
 ```bash
 python build.py                              # interaktiver Assistent
 python build.py wizard                       # dasselbe, explizit
-python build.py --non-interactive            # direkter Build mit config.ini
-python build.py --iso path/to/game.iso       # direkter Build mit ISO
+python build.py --non-interactive            # direkter Build mit config.ini, ohne Rückfragen
+python build.py --iso "path/to/game.iso"     # direkter Build mit bestimmtem ISO
 python build.py --only preflight,prepare,extract   # nach dem Entpacken stoppen
 python build.py --skip audio                       # ohne Radio-Streams bauen
 python build.py --dry-run                          # nur den Plan zeigen
@@ -223,7 +239,7 @@ reuse_build = False
 
 | Schlüssel | Bedeutung |
 |---|---|
-| `iso_name` | Pfad/Name des Original-ISOs (relativ zum Projektordner). |
+| `iso_name` | Pfad/Name des Original-ISOs (relativ zum aktuellen Arbeitsordner; normalerweise dem Projektordner). |
 | `output` | Name des fertigen ISOs. Wird bei jedem Build überschrieben. |
 | `project_path` | Quellordner mit den Mod-Dateien. |
 | `build_path` | Arbeitsordner für das entpackte ISO. **Wird bei jedem Build gelöscht**, außer `reuse_build`/`--reuse-build` ist gesetzt. |
@@ -525,4 +541,4 @@ python build.py stages            # Stage-Keys auflisten
 - **fastman92** – IMG Console (im Original-Build genutzt, jetzt durch `imgtool.py` ersetzt)
 - **UltraISO** – ISO-Erstellung (im Original-Build genutzt, jetzt durch `pycdlib` ersetzt)
 - **pycdlib**, **py7zr** – Python-Bibliotheken für ISO- und 7z-Verarbeitung
-- **opencode-agent[bot]** und **DeepSeek** – Dokumentation, Build-Tooling und Wartung dieser Weiterführung
+- **Devin**, **opencode-agent[bot]** und **DeepSeek** – KI-Unterstützung bei Dokumentation, Build-Tooling und Wartung dieser Weiterführung

@@ -4,7 +4,7 @@ A build tool and asset pack that brings **GTA V content into GTA San Andreas on 
 
 Everything runs in **pure Python** – no UltraISO, no Windows-only helper tools. The build works on Windows, Linux and macOS.
 
-The result is a playable ISO for real PS2 hardware (e.g. via FreeMcBoot/OPL) or emulators such as PCSX2.
+The goal is an ISO for real PS2 hardware (for example, through FreeMcBoot/OPL) and emulators such as PCSX2. This is an unfinished alpha, so compatibility and gameplay are not guaranteed.
 
 > **Status:** "Closed Alpha" – a hobby/fan project in active, unfinished development. Expect missing assets, placeholders and crashes.
 >
@@ -108,35 +108,52 @@ If you have a different (already modded) version, pass `--allow-modded` or set `
 
 ## Quick start
 
-```bash
-# 1. Install dependencies (or let the tool do it: python build.py deps --install-deps)
-pip install -r requirements.txt
+### 1. Install Python dependencies
 
-# 2. Run the interactive wizard (you can drag & drop the ISO)
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 2. Add your original game ISO
+
+Use your legally obtained **GTA San Andreas (USA, NTSC-U v1.03) PS2 ISO**. Put it in the repository folder with the default filename from `config.ini`, or keep it elsewhere and pass its path with `--iso`.
+
+The default build checks the ISO's MD5 and SHA1 before it changes the build folder. Other versions are not supported by default.
+
+### 3. Check the setup and build
+
+```bash
+python build.py check
 python build.py
-
-# Or run non-interactively with an explicit ISO:
-python build.py --iso "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
 ```
 
-The wizard guides you through selecting the ISO, output name, checksum verification and build options before starting.
+In a terminal, `python build.py` opens the interactive wizard. It asks for the ISO and output path, shows the selected options, then starts the build after you confirm. You can drag the ISO file into the terminal when it asks for its path.
 
-The tool tells you what is missing before it touches anything:
+To build without prompts, pass the ISO path directly:
 
 ```bash
-python build.py check      # environment, packages, free space, ISO checksum
-python build.py deps       # list missing Python packages
-python build.py info       # resolved paths and settings
-python build.py stages     # list every build stage
+python build.py --iso "D:/Games/Grand Theft Auto - San Andreas.iso" --output "D:/Games/GTA V Legacy.iso"
 ```
 
-On Windows the PowerShell wrapper forwards all arguments:
+On Windows, the PowerShell wrapper is also available:
 
 ```powershell
-.\build.ps1 --output "GTA V Legacy.iso" -v
+.\build.ps1 --iso "D:\Games\Grand Theft Auto - San Andreas.iso" --output "D:\Games\GTA V Legacy.iso"
 ```
 
-The finished image is named according to `config.ini` (default `GTA V Legacy Closed Alpha.iso`). Test it in **PCSX2** or on a PS2 (OPL/FreeMcBoot).
+The output file is overwritten if it already exists. A normal build also recreates the working `build/` folder; use `--reuse-build` only when you intentionally want to reuse its extracted files.
+
+### Useful first commands
+
+```bash
+python build.py --help       # show all commands and options
+python build.py deps         # check required Python packages
+python build.py info         # show resolved paths and stream/package status
+python build.py stages       # list the build stages
+python build.py --dry-run    # preview the stage plan; does not validate the ISO
+```
+
+The finished image uses the output path from `config.ini` unless you pass `--output`. Try it in **PCSX2** or on a PS2 with OPL/FreeMcBoot.
 
 ---
 
@@ -195,8 +212,8 @@ Examples:
 ```bash
 python build.py                              # interactive wizard
 python build.py wizard                       # same, explicitly
-python build.py --non-interactive            # direct build using config.ini
-python build.py --iso path/to/game.iso       # direct build with specific ISO
+python build.py --non-interactive            # direct build using config.ini, no prompts
+python build.py --iso "path/to/game.iso"     # direct build with a specific ISO
 python build.py --only preflight,prepare,extract   # stop after extracting
 python build.py --skip audio                       # build without radio streams
 python build.py --dry-run                          # show the plan only
@@ -222,7 +239,7 @@ reuse_build = False
 
 | Key | Meaning |
 |---|---|
-| `iso_name` | Path/name of the original ISO (relative to the project folder). |
+| `iso_name` | Path/name of the original ISO (relative to the current working directory; normally run from the repository folder). |
 | `output` | Name of the finished ISO. Overwritten on every build. |
 | `project_path` | Source folder with the mod files. |
 | `build_path` | Working folder for the extracted ISO. **Removed on every build** unless `reuse_build`/`--reuse-build` is set. |
@@ -524,4 +541,4 @@ python build.py stages            # list the stage keys
 - **fastman92** – IMG Console (used by the original build, now replaced by `imgtool.py`)
 - **UltraISO** – ISO creation (used by the original build, now replaced by `pycdlib`)
 - **pycdlib**, **py7zr** – Python libraries for ISO and 7z handling
-- **opencode-agent[bot]** and **DeepSeek** – documentation, build tooling and maintenance of this continuation
+- **Devin**, **opencode-agent[bot]** and **DeepSeek** – AI assistance with documentation, build tooling and maintenance of this continuation
