@@ -1,0 +1,256 @@
+"""End-to-end smoke test using a miniature fake game ISO.
+
+Run with::
+
+    python -m unittest discover -s tests -v
+
+The test does not need the real game: it creates a tiny ISO with the same
+structure, runs the complete build and checks the resulting image.
+"""
+
+from __future__ import annotations
+
+import logging
+import struct
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+import buildiso  # noqa: E402
+import imgtool  # noqa: E402
+import pycdlib  # noqa: E402
+
+
+def make_img(path: Path, files: dict[str, bytes]) -> None:
+    """Write a minimal VER2 archive containing ``files``."""
+    count = len(files)
+    header_bytes = imgtool.HEADER_SIZE + imgtool.ENTRY_SIZE * count
+    first_sector = -(-header_bytes // imgtool.SECTOR_SIZE)
+
+    layout: list[tuple[str, int, int]] = []
+    sector = first_sector
+    for name, data in files.items():
+        sectors = -(-len(data) // imgtool.SECTOR_SIZE)
+        layout.append((name, sector, sectors))
+        sector += sectors
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("wb") as handle:
+        handle.write(imgtool.MAGIC)
+        handle.write(struct.pack("<I", count))
+        for name, offset, sectors in layout:
+            handle.write(struct.pack("<IHH", offset, sectors, 0))
+            handle.write(name.encode("latin-1").ljust(24, b"\0"))
+        handle.write(b"\0" * (first_sector * imgtool.SECTOR_SIZE - header_bytes))
+        for name, data in files.items():
+            handle.write(data)
+            handle.write(b"\0" * (-len(data) % imgtool.SECTOR_SIZE))
+
+
+def make_iso(path: Path, files: dict[str, bytes]) -> None:
+    """Write an ISO9660 level 1 image containing ``files``."""
+    work = path.parent / "iso-source"
+    iso = pycdlib.PyCdlib()
+    try:
+        iso.new(interchange_level=1, vol_ident="TEST", joliet=None, rock_ridge=None)
+
+        directories: set[str] = set()
+        for relative in files:
+            parts = Path(relative).parts[:-1]
+            for depth in range(1, len(parts) + 1):
+                directories.add("/".join(parts[:depth]))
+        for directory in sorted(directories):
+            iso.add_directory(iso_path="/" + directory)
+
+        for relative, data in sorted(files.items()):
+            local = work / relative
+            local.parent.mkdir(parents=True, exist_ok=True)
+            local.write_bytes(data)
+            iso.add_file(str(local), iso_path=f"/{relative};1")
+
+        iso.write(str(path))
+    finally:
+        iso.close()
+
+
+def iso_children(iso, iso_path: str = "/") -> list[str]:
+    names = []
+    for record in iso.list_children(iso_path=iso_path):
+        if record is None or record.is_dot() or record.is_dotdot():
+            continue
+        names.append(record.file_identifier().decode())
+    return sorted(names)
+
+
+class ImgToolTest(unittest.TestCase):
+    def test_roundtrip_replace_and_add(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            original = work / "gta3.img"
+            make_img(original, {"OLD.DFF": b"A" * 10, "KEEP.DFF": b"K" * 5000})
+
+            replacement = work / "new.dff"
+            replacement.write_bytes(b"B" * 3000)
+            addition = work / "added.txd"
+            addition.write_bytes(b"C" * 4096)
+
+            result = imgtool.rebuild(
+                original,
+                work / "out.img",
+                {"OLD.DFF": replacement},
+                [addition],
+            )
+
+            self.assertEqual(result.total, 3)
+            self.assertEqual(result.replaced, 1)
+            self.assertEqual(result.added, 1)
+
+            entries = {entry.name: entry for entry in imgtool.read_directory(work / "out.img")}
+            self.assertEqual(set(entries), {"OLD.DFF", "KEEP.DFF", "ADDED.TXD"})
+            self.assertEqual(entries["OLD.DFF"].byte_size, 4096)
+            self.assertEqual(entries["ADDED.TXD"].byte_size, 4096)
+
+            data = (work / "out.img").read_bytes()
+            old = entries["OLD.DFF"]
+            self.assertEqual(
+                data[old.byte_offset : old.byte_offset + 3000],
+                b"B" * 3000,
+            )
+            keep = entries["KEEP.DFF"]
+            self.assertEqual(
+                data[keep.byte_offset : keep.byte_offset + 5000],
+                b"K" * 5000,
+            )
+
+    def test_rejects_non_ver2(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "bad.img"
+            path.write_bytes(b"VER1" + b"\0" * 64)
+            with self.assertRaises(imgtool.ImgError):
+                imgtool.read_directory(path)
+
+
+class BuildTest(unittest.TestCase):
+    def setUp(self) -> None:
+        logging.disable(logging.CRITICAL)
+
+    def tearDown(self) -> None:
+        logging.disable(logging.NOTSET)
+
+    def test_full_build(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+
+            # Two archives: one with a model that will be replaced, one interior.
+            gta3_source = work / "source-gta3.img"
+            make_img(gta3_source, {"LANDSTAL.DFF": b"old-model", "KEEP.TXD": b"keep"})
+            interior_source = work / "source-int.img"
+            make_img(interior_source, {"MUNATION.TXD": b"shop"})
+
+            original_iso = work / "game.iso"
+            make_iso(
+                original_iso,
+                {
+                    "SYSTEM.CNF": b"BOOT2 = cdrom0:\\SLUS_209.46;1\r\n",
+                    "SLUS_209.46": b"fake-elf" * 16,
+                    "MODELS/GTA3.IMG": gta3_source.read_bytes(),
+                    "MODELS/GTA_INT.IMG": interior_source.read_bytes(),
+                    "MODELS/GTA3_1.IMG": b"should-be-dropped",
+                    "MOVIES/LOGO.PSS": b"should-be-dropped",
+                    "DATA/HANDLING.CFG": b"original-handling",
+                },
+            )
+
+            project = work / "project"
+            (project / "models").mkdir(parents=True)
+            (project / "models" / "gta3.img").write_bytes(gta3_source.read_bytes())
+            (project / "models" / "gta_int.img").write_bytes(interior_source.read_bytes())
+            (project / "data").mkdir()
+            (project / "data" / "HANDLING.CFG").write_bytes(b"patched-handling")
+
+            vehicle = project / "assets" / "Vehicles" / "Cars" / "Landstal"
+            vehicle.mkdir(parents=True)
+            (vehicle / "landstal.dff").write_bytes(b"NEW-MODEL-DATA")
+            (vehicle / "notes.txt").write_bytes(b"ignored documentation")
+
+            interior = project / "assets" / "Interiors"
+            interior.mkdir(parents=True)
+            (interior / "new_interior.txd").write_bytes(b"interior-texture")
+
+            output = work / "out.iso"
+            exit_code = buildiso.main(
+                [
+                    "--config", str(ROOT / "config.ini"),
+                    "--iso", str(original_iso),
+                    "--project-dir", str(project),
+                    "--build-dir", str(work / "build"),
+                    "--output", str(output),
+                    "--allow-modded",
+                ]
+            )
+            self.assertEqual(exit_code, 0, "build failed")
+            self.assertTrue(output.is_file())
+
+            iso = pycdlib.PyCdlib()
+            try:
+                iso.open(str(output))
+                root = iso_children(iso)
+                self.assertIn("SYSTEM.CNF;1", root)
+                self.assertNotIn("MOVIES", root)
+
+                extracted = work / "check"
+                extracted.mkdir()
+                iso.get_file_from_iso(str(extracted / "handling.cfg"), iso_path="/DATA/HANDLING.CFG;1")
+                self.assertEqual((extracted / "handling.cfg").read_bytes(), b"patched-handling")
+
+                iso.get_file_from_iso(
+                    str(extracted / "gta3.img"), iso_path="/MODELS/GTA3.IMG;1"
+                )
+                entries = {
+                    entry.name: entry
+                    for entry in imgtool.read_directory(extracted / "gta3.img")
+                }
+                self.assertIn("LANDSTAL.DFF", entries)
+                self.assertNotIn("NOTES.TXT", entries)
+                self.assertIn("KEEP.TXD", entries)
+
+                payload = (extracted / "gta3.img").read_bytes()
+                landstal = entries["LANDSTAL.DFF"]
+                self.assertEqual(
+                    payload[landstal.byte_offset : landstal.byte_offset + len(b"NEW-MODEL-DATA")],
+                    b"NEW-MODEL-DATA",
+                )
+
+                iso.get_file_from_iso(
+                    str(extracted / "gta_int.img"), iso_path="/MODELS/GTA_INT.IMG;1"
+                )
+                interiors = {
+                    entry.name
+                    for entry in imgtool.read_directory(extracted / "gta_int.img")
+                }
+                self.assertIn("NEW_INTERIOR.TXD", interiors)
+                self.assertIn("MUNATION.TXD", interiors)
+
+                self.assertNotIn("GTA3_1.IMG", iso_children(iso, "/MODELS"))
+            finally:
+                iso.close()
+
+
+class IsoPathTest(unittest.TestCase):
+    def test_valid_names(self) -> None:
+        self.assertEqual(buildiso.iso_path(Path("MODELS/GTA3.IMG"), is_file=True),
+                         "/MODELS/GTA3.IMG;1")
+        self.assertEqual(buildiso.iso_path(Path("MOVIES"), is_file=False), "/MOVIES")
+
+    def test_invalid_names(self) -> None:
+        for name in ("DATA/TOOLONGNAME.TXT", "DATA/BAD-NAME.CFG", "DATA/NAME.TOOLONG"):
+            with self.assertRaises(buildiso.BuildError):
+                buildiso.iso_path(Path(name), is_file=True)
+
+
+if __name__ == "__main__":
+    unittest.main()
