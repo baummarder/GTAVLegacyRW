@@ -1,5 +1,7 @@
 # GTA V Legacy
 
+![GTA V Legacy — Los Santos and San Andreas on PlayStation 2](docs/readme-banner.svg)
+
 ### Los Santos energy. San Andreas streets. PlayStation 2.
 
 An unofficial conversion project bringing selected **GTA V vehicles, weapons, audio and visual assets** into **GTA San Andreas for PlayStation 2**. The Python build tool applies the project files to a compatible San Andreas ISO and creates a new image.

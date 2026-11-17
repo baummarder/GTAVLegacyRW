@@ -1,5 +1,7 @@
 # GTA V Legacy
 
+![GTA V Legacy – Los Santos und San Andreas auf PlayStation 2](docs/readme-banner.svg)
+
 ### Los Santos. San Andreas. PlayStation 2.
 
 Ein inoffizielles Konvertierungsprojekt, das ausgewählte **Fahrzeuge, Waffen, Audio- und Grafik-Assets aus GTA V** in **GTA San Andreas für PlayStation 2** bringt. Das Python-Build-Tool überträgt die Projektdateien auf ein kompatibles San-Andreas-ISO und erstellt daraus ein neues Image.

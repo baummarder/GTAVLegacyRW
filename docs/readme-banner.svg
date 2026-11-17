@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">GTA V Legacy for PlayStation 2</title>
+  <desc id="desc">A neon sunset over a low-poly Los Santos skyline, with the words GTA V Legacy and San Andreas, PlayStation 2.</desc>
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1">
+      <stop offset="0" stop-color="#101729"/>
+      <stop offset=".52" stop-color="#3c2844"/>
+      <stop offset="1" stop-color="#f06b68"/>
+    </linearGradient>
+    <linearGradient id="glow" x2="1" y2="0">
+      <stop stop-color="#fb7583" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#f6b166" stop-opacity=".05"/>
+    </linearGradient>
+    <linearGradient id="road" x2="0" y2="1">
+      <stop stop-color="#18202f"/>
+      <stop offset="1" stop-color="#090e18"/>
+    </linearGradient>
+    <pattern id="scanlines" width="4" height="5" patternUnits="userSpaceOnUse">
+      <path d="M0 4.5h4" stroke="#fff" stroke-opacity=".055"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="360" fill="url(#sky)"/>
+  <path d="M0 214c173-41 273-34 412 2s256 29 391-2 265-44 397-18v94H0z" fill="url(#glow)"/>
+  <circle cx="862" cy="142" r="72" fill="#ffba83" opacity=".88"/>
+  <circle cx="862" cy="142" r="96" fill="#ff8f88" opacity=".12"/>
+  <path d="M790 142h144M796 159h132M807 176h110" stroke="#a84d65" stroke-opacity=".45" stroke-width="5"/>
+
+  <g fill="#171b2b">
+    <path d="M0 246h62v-57h26v57h30v-88h47v88h32v-43h24v43h39v-76h46v76h42v-108h33v108h42v-63h52v63h36v-89h28v89h36v-52h54v52h44v-97h29v97h33v-63h45v63h37v-111h39v111h40v-48h47v48h40v-76h39v76h42v-59h45v59h46v-92h39v92h42v-43h48v43h44v-74h49v74h28v39H0z"/>
+    <path d="M56 241h4v-28h8v28m129 0h5v-19h6v19m178 0h4v-34h7v34m219 0h5v-25h7v25m166 0h5v-31h8v31m162 0h4v-22h7v22m165 0h5v-29h8v29" fill="#f7a26f" opacity=".55"/>
+  </g>
+
+  <g fill="none" stroke="#111725" stroke-width="8" stroke-linecap="round">
+    <path d="M107 294V174m0 0c-24-31-42-36-62-34m62 34c18-37 39-52 61-54m-61 54c-8-39-2-59 13-77m-13 77c-31-14-49-16-70-12m70 12c26-15 44-20 67-17"/>
+    <path d="M1128 299V164m0 0c-24-29-42-34-61-31m61 31c18-39 39-53 60-56m-60 56c-8-37-2-58 13-77m-13 77c-31-13-49-15-70-11m70 11c26-15 44-20 67-17"/>
+  </g>
+
+  <path d="M0 279h1200v81H0z" fill="url(#road)"/>
+  <path d="M0 279h1200" stroke="#ff8a7b" stroke-opacity=".75" stroke-width="2"/>
+  <path d="M524 360l94-81h30l-41 81m85 0-18-81h22l43 81" fill="#20283a"/>
+  <path d="M0 323h496m342 0h362" stroke="#f8ca91" stroke-opacity=".68" stroke-width="2" stroke-dasharray="30 22"/>
+  <rect width="1200" height="360" fill="url(#scanlines)"/>
+  <rect x="1" y="1" width="1198" height="358" fill="none" stroke="#ffffff" stroke-opacity=".15"/>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="76" y="86" fill="#f3c49b" font-size="16" font-weight="700" letter-spacing="5">LOS SANTOS  /  SAN ANDREAS</text>
+    <text x="72" y="163" fill="#fff8ef" font-size="67" font-weight="800" letter-spacing="2">GTA V LEGACY</text>
+    <path d="M77 185h414" stroke="#f58280" stroke-width="4"/>
+    <text x="78" y="220" fill="#e8e6ea" font-size="20" font-weight="500" letter-spacing="4">A NEW ERA. OLD-SCHOOL HARDWARE.</text>
+    <text x="79" y="331" fill="#f3c49b" font-size="14" font-weight="700" letter-spacing="4">PLAYSTATION 2  ·  CLOSED ALPHA</text>
+  </g>
+</svg>
