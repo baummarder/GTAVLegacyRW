@@ -2,6 +2,8 @@
 
 A build tool and asset pack that brings **GTA V content into GTA San Andreas on the PlayStation 2**. Instead of writing a new engine, it takes an existing **GTA San Andreas (NTSC-U, v1.03) ISO**, unpacks it, overlays it with assets converted from GTA V, and repacks it into a new ISO.
 
+Everything runs in **pure Python** – no UltraISO, no Windows-only helper tools. The build works on Windows, Linux and macOS.
+
 The result is a playable ISO for real PS2 hardware (e.g. via FreeMcBoot/OPL) or emulators such as PCSX2.
 
 > **Status:** "Closed Alpha" – a hobby/fan project in active, unfinished development. Expect missing assets, placeholders and crashes.
@@ -26,7 +28,7 @@ The result is a playable ISO for real PS2 hardware (e.g. via FreeMcBoot/OPL) or 
 - [Audio / radio streams](#audio--radio-streams)
 - [Known pitfalls](#known-pitfalls)
 - [Continuing the project](#continuing-the-project)
-- [Publishing your fork](#publishing-your-fork)
+- [Publishing this fork](#publishing-this-fork)
 - [Development notes](#development-notes)
 - [Legal](#legal)
 - [Credits](#credits)
@@ -42,7 +44,8 @@ This project did not start from scratch. It is a **continuation (legacy fork)** 
 | **Original project** | [DanielSant0s/GTAVLegacy](https://github.com/DanielSant0s/GTAVLegacy) |
 | **Original author** | Daniel Santos ([@DanielSant0s](https://github.com/DanielSant0s)) |
 | **Original work** | Build system, asset conversions, PS2 overlays and plugins, `SLUS_209.46` toolchain |
-| **This fork** | Keeps that work alive: documentation, reproducible builds, a proper CLI, error handling and maintenance |
+| **This continuation** | [baummarder/GTAVLegacyRW](https://github.com/baummarder/GTAVLegacyRW) – documentation, pure-Python build, tests, maintenance |
+| **Maintainer** | [@baummarder](https://github.com/baummarder) |
 | **License** | MIT for the code (see `LICENSE`, © 2023 Daniel Santos) |
 
 The 15 original commits (2023–2024) are preserved unchanged and remain authored by Daniel Santos. All changes made in this continuation are additional commits on top, and every commit made here credits the AI assistance used for it via `Co-authored-by` trailers.
@@ -59,8 +62,8 @@ If you build on this project, please keep the lineage visible and credit the ori
 2. extracts the ISO into `build/`,
 3. copies the project's own files from `src/` over the extracted ISO,
 4. unpacks the split `STREAMS.7z.*` archives (GTA V radio stations as PS2 audio streams),
-5. packs models, textures, weapons, vehicles etc. into `gta3.img` and `gta_int.img` using **fastman92 IMG Console**,
-6. builds the final ISO with **UltraISO**.
+5. merges the converted assets into `gta3.img` and `gta_int.img` with a built-in IMG writer,
+6. builds the final ISO with `pycdlib`.
 
 The repo also ships PS2 binary patches (`src/overlays/*.NM`, `src/plugins/*.dep`) that extend the game at console level (CLEO support and custom opcodes, among other things).
 
@@ -82,13 +85,11 @@ Asset categories included:
 
 | Needed | Details |
 |---|---|
-| **Windows** | The build invokes `UltraISO.exe` and `fastman92ImgConsole32.exe`. Linux/macOS will not work without changes. |
-| **Python 3.9+** | Tested with Python 3.14. Invoke it as `python` (on Windows it is usually not `python3`). |
+| **Python 3.9+** | Tested with Python 3.14 on Windows. Invoke it as `python` (or `python3` on Linux/macOS). |
 | **Python packages** | `pip install -r requirements.txt` (installs `pycdlib` and `py7zr`) |
 | **Original ISO** | *Grand Theft Auto - San Andreas (USA) (v1.03)* – NTSC-U. Other versions will not work without adapting the `data/` files. |
-| **UltraISO** | Must be available as `UltraISO/UltraISO.exe` inside the project folder (path is configurable). |
-| **fastman92 IMG Console** | Already included in the repo (`IMGconsole_32-bit/`), together with `zlib1.dll`. |
-| **Free disk space** | Several GB – the ISO is extracted, repacked, and the final ISO is written on top of that. |
+| **Free disk space** | Several GB – the ISO is extracted, the new ISO is written next to it, and audio archives are unpacked temporarily. |
+| **Operating system** | Windows, Linux or macOS. No external tools required. |
 
 ### ISO checksums
 
@@ -105,7 +106,7 @@ If you have a different (already modded) version, pass `--allow-modded` or set `
 
 ## Quick start
 
-```powershell
+```bash
 # 1. Install dependencies
 pip install -r requirements.txt
 
@@ -113,18 +114,15 @@ pip install -r requirements.txt
 #    The filename must match config.ini, e.g.:
 #    "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
 
-# 3. Extract UltraISO into ./UltraISO/ (UltraISO.exe)
+# 3. Check config.ini (see below)
 
-# 4. Check config.ini (see below)
-
-# 5. Build
-python .\buildiso.py
+# 4. Build
+python buildiso.py
 ```
 
-Or use the PowerShell wrapper, which forwards all arguments:
+On Windows the PowerShell wrapper forwards all arguments:
 
 ```powershell
-.\build.ps1
 .\build.ps1 --output "GTA V Legacy.iso" -v
 ```
 
@@ -143,12 +141,10 @@ Every option overrides the matching `config.ini` value.
 | `--config PATH` | Config file to read (default `config.ini`). |
 | `--project-dir PATH` | Mod source folder (default `./src`). |
 | `--build-dir PATH` | Working folder for the extracted ISO (default `./build`). |
-| `--ultraiso-dir PATH` | Folder containing `UltraISO.exe`. |
-| `--imgconsole-dir PATH` | Folder containing `fastman92ImgConsole32.exe`. |
 | `--allow-modded` | Skip the ISO checksum verification. |
 | `--reuse-build` | Reuse an existing extraction instead of extracting again. |
 | `--clean` | Force a clean build (remove the build folder). Default unless `--reuse-build` is given. |
-| `-v`, `--verbose` | Debug logging, including the exact tool invocations. |
+| `-v`, `--verbose` | Debug logging, including every file that is added. |
 | `-h`, `--help` | Show all options. |
 
 The script exits with `0` on success and `1` on a build error (with a readable message instead of a traceback).
@@ -161,10 +157,8 @@ The script exits with `0` on success and `1` on a build error (with a readable m
 [DEFAULT]
 iso_name = Grand Theft Auto - San Andreas (USA) (v1.03).iso
 output = GTA V Legacy Closed Alpha.iso
-uiso_path = $cwd\UltraISO
 project_path = ./src
 build_path = ./build
-imgconsole_path = ./IMGconsole_32-bit
 allow_modded = False
 reuse_build = False
 ```
@@ -173,14 +167,12 @@ reuse_build = False
 |---|---|
 | `iso_name` | Path/name of the original ISO (relative to the project folder). |
 | `output` | Name of the finished ISO. Overwritten on every build. |
-| `uiso_path` | Folder containing `UltraISO.exe`. `$cwd` is replaced with the working directory. |
 | `project_path` | Source folder with the mod files. |
 | `build_path` | Working folder for the extracted ISO. **Removed on every build** unless `reuse_build`/`--reuse-build` is set. |
-| `imgconsole_path` | Folder containing `fastman92ImgConsole32.exe`. |
 | `allow_modded` | `True` = skip the ISO checksum verification. |
 | `reuse_build` | `True` = keep and reuse an existing `build/` extraction (faster, but stale files can leak into the ISO). |
 
-The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is gone.
+The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is gone. The former `uiso_path` and `imgconsole_path` keys are obsolete because no external tools are used any more.
 
 ---
 
@@ -193,14 +185,14 @@ The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is 
 3. **Extract the ISO** – recursively into `build/` via `pycdlib`.
 4. **Copy mod files** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/`, plus the contents of `overlays/`. Stale files that must not ship (`models/gta3_1.img`, `movies/`) are removed.
 5. **Unpack audio streams** – all `STREAMS.7z.*` parts in `src/audio/STREAMS/` are joined into `result.7z`, extracted, and the archive is deleted.
-6. **Rebuild the IMG files** – `gta3.img`/`gta_int.img` are copied into `IMGconsole_32-bit/`, the asset folders are unpacked into `gta3/` and `gta_int/`, and everything is repacked via `build.txt` with **fastman92 IMG Console**.
-7. **Write the ISO** – UltraISO takes the original ISO, overlays `build/`, drops `MODELS/GTA3_1.IMG` and `MOVIES`, and writes the output ISO.
+6. **Rebuild the IMG archives** – every file under `src/assets/` is merged into `gta3.img` / `gta_int.img` by `imgtool.py`: entries that already exist are replaced, new ones are appended. The archives are rewritten sector by sector, so they never have to fit into memory.
+7. **Write the ISO** – `pycdlib` creates a fresh ISO9660 level 1 image from `build/`.
 8. **Verify the output** – the resulting ISO must exist and be non-empty.
 
 Expected output (roughly):
 
 ```
-GTA V Legacy builder v0.2
+GTA V Legacy builder v0.3
       Project: src
       Build:   build
 [1/8] Checking input ISO ...
@@ -210,12 +202,21 @@ GTA V Legacy builder v0.2
 [4/8] Copying mod files ...
 [5/8] Unpacking audio streams ...
 [6/8] Rebuilding IMG archives ...
+      gta3.img: 10632 entries (412 replaced, 96 added, 1.1 GiB)
+      gta_int.img: 1221 entries (18 replaced, 0 added, 98.0 MiB)
 [7/8] Writing ISO ...
+      Packaging 78 files ...
 [8/8] Verifying output ...
       GTA V Legacy Closed Alpha.iso (4.2 GiB)
 
 Done.
 ```
+
+Notes on the formats used by the Python implementation:
+
+- IMG archives are **VER2** (GTA San Andreas). Entries are limited to 65535 sectors (~128 MiB) and 23 characters per name, exactly like the original tools. Violations abort the build with a clear message.
+- The ISO is written as plain **ISO9660 level 1**: names must be 8.3, uppercase, `A-Z 0-9 _`. The original game files already satisfy this; unusual new filenames abort the build with the offending path.
+- The ISO is rebuilt from the file contents, not by patching the original image byte by byte. The directory order may therefore differ from the retail disc.
 
 ---
 
@@ -224,11 +225,13 @@ Done.
 ```
 GTAVLegacy/
 ├─ buildiso.py               # Build script (entry point, CLI)
+├─ imgtool.py                # IMG (VER2) reader/writer, pure Python
 ├─ build.ps1                 # PowerShell wrapper, forwards arguments
 ├─ config.ini                # Paths & options
 ├─ requirements.txt          # pycdlib, py7zr
+├─ tests/test_smoke.py       # end-to-end test with a fake ISO
 ├─ .githooks/                # prepare-commit-msg hook (co-author trailers)
-├─ IMGconsole_32-bit/        # fastman92 IMG Console + build.txt
+├─ IMGconsole_32-bit/        # legacy: fastman92 IMG Console, no longer used
 ├─ src/                      # All mod content
 │  ├─ anim/                  # IFP animations (ped.ifp, gangs.ifp)
 │  ├─ assets/                # Source files that go into the IMGs
@@ -236,7 +239,7 @@ GTAVLegacy/
 │  │  ├─ Vehicles/  Weapons/  Interiors/
 │  │  ├─ Cars to convert/    # GTA V models not converted yet
 │  │  ├─ Maps to convert/  Objects to convert/  Wrecked cars/
-│  │  └─ build.txt           # IMG Console script
+│  │  └─ build.txt           # legacy IMG Console script, no longer used
 │  ├─ audio/                 # CONFIG/, SFX/ and STREAMS/ (7z parts)
 │  ├─ data/                  # GTA SA data tables (handling, ide, ipl ...)
 │  ├─ intro/                 # RGM intro videos
@@ -264,7 +267,7 @@ Important: `build/` and the temporary `IMGconsole_32-bit/gta3*` folders are **ar
    src/assets/Vehicles/Cars/MyCar/my_car.dff
    src/assets/Vehicles/Cars/MyCar/my_car.txd
    ```
-2. The build copies the whole folder recursively into `gta3.img`. Files ending in `.txt`, `.cfg`, `.ide`, `.dat` are **ignored** – handy for notes.
+2. The build merges the whole folder recursively into `gta3.img`. Files ending in `.txt`, `.cfg`, `.ide`, `.dat` are **ignored** – handy for notes.
 3. Add entries to `src/data/VEHICLES.IDE`, `HANDLING.CFG`, `CARCOLS.DAT`, `CARMODS.DAT` etc., otherwise the model is unusable in-game.
 4. Texture/model names must match the IDE file.
 
@@ -296,9 +299,9 @@ The build detects the parts automatically and joins them in numeric order:
 parts = collect_stream_parts(project / "audio" / "STREAMS")
 ```
 
-You can add or remove parts freely – no `range()` constant to update. If the numbering has gaps, the build prints a warning instead of silently producing broken audio.
+You can add or remove parts freely – there is no `range()` constant to maintain. If the numbering has gaps, the build warns instead of silently producing broken audio.
 
-To create your own streams, `Wav 2 GTA V Legacy PS2.exe` is included in the repo root. Convert WAV files with it and place the result in `src/audio/STREAMS/`.
+To create your own streams, `Wav 2 GTA V Legacy PS2.exe` is included in the repo root (Windows). Convert WAV files with it and place the result in `src/audio/STREAMS/`.
 
 If the folder is missing entirely, the build warns and continues without custom audio.
 
@@ -309,30 +312,32 @@ If the folder is missing entirely, the build warns and continues without custom 
 | Problem | Cause / fix |
 |---|---|
 | Checksum error | Wrong ISO version. Only NTSC-U v1.03 has the expected hashes; otherwise use `--allow-modded`. |
-| UltraISO does not start | `UltraISO.exe` missing under `./UltraISO` or the path in `config.ini` is wrong. |
-| UltraISO produced no output | Trial version, a missing build folder, or a locked output file. |
 | `gta3.img` not found | The ISO extraction is incomplete – delete `build/` and rebuild. |
 | Stale assets in the ISO | `reuse_build = True` or `--reuse-build` was used. Run with `--clean`. |
-| Huge memory usage | The 7z parts are buffered as one large `result.7z` inside `build/`. |
+| `... cannot be stored in a plain ISO9660 image` | A file in `build/` is not 8.3/uppercase. Rename it in `src/`. |
+| `Entry name ... is N characters long` | IMG entry names are limited to 23 characters. |
+| `needs N sectors, the format only allows 65535` | A single file is larger than ~128 MiB and cannot be stored in a VER2 archive. |
+| Huge memory usage | The 7z parts are joined as one `result.7z` inside `build/`; use a machine with enough free disk space. |
 | No audio in-game | The `STREAMS.7z.*` parts are incomplete or numbers have gaps (see the warning). |
 | Crash on load | Usually missing IDE/IPL/handling entries for newly added assets. |
 | Missing Python package | `pip install -r requirements.txt`. |
 
 Fixed in this continuation compared to the original script:
 
+- Runs on Windows, Linux and macOS: UltraISO and fastman92 IMG Console are replaced by pure Python (`pycdlib` + `imgtool.py`).
 - `build.ps1` no longer calls the non-existent `python3` on Windows.
 - `result.7z` is written fresh (`wb`) instead of appended (`ab`), so rebuilds cannot corrupt it.
 - Failures are reported as readable errors with exit code `1` instead of tracebacks.
 - The ISO is validated *before* the build folder is deleted.
 - The number of audio parts is detected instead of hardcoded.
-- External tools are checked for existence and their exit codes are verified.
 - Every option can be overridden from the command line.
+- There is an end-to-end smoke test that builds a complete (tiny) ISO.
 
 Remaining technical debt:
 
-- Windows only; UltraISO and IMG Console are 32-bit executables.
-- No automated tests or asset validation (missing TXD/IDE references are not detected).
-- ISO writing still depends on UltraISO (see the roadmap).
+- No asset validation (missing TXD/IDE references are not detected).
+- The generated ISO uses a fresh layout instead of preserving the retail disc order.
+- Only `gta3.img` and `gta_int.img` are rebuilt; `player.img` is untouched.
 
 ---
 
@@ -341,30 +346,29 @@ Remaining technical debt:
 Roadmap for the next steps:
 
 1. **Take stock** – Which assets are fully converted, which still sit under `* to convert/`? Collect TODOs from `src/assets/*/build.txt` and the `.txt` notes.
-2. **Drop the Windows-only ISO step** – `pycdlib` can write ISOs; that would make UltraISO optional and let the build run natively on any OS.
-3. **Document the asset pipeline** – Which tools (Blender, ZModeler, Magic.TXD, …) and which conversion steps take you from GTA V to PS2-compatible DFF/TXD? That is the biggest knowledge loss in this repo.
-4. **Validation** – Before building the ISO, check that every DFF has a matching TXD and an IDE entry; print warnings for missing references.
-5. **Tests** – At minimum a smoke test: extract ISO, copy assets, build IMG, compare file lists.
-6. **Release process** – Versioning, changelog, publish the hash of the generated ISO.
+2. **Document the asset pipeline** – Which tools (Blender, ZModeler, Magic.TXD, …) and which conversion steps take you from GTA V to PS2-compatible DFF/TXD? That is the biggest knowledge loss in this repo.
+3. **Validation** – Before writing the ISO, check that every DFF has a matching TXD and an IDE entry; print warnings for missing references.
+4. **Compatibility check on hardware** – Verify a release build in PCSX2 and on a real PS2 (OPL/FreeMcBoot), including audio streaming.
+5. **Release process** – Versioning, changelog, publish the hash of the generated ISO.
+6. **Cleanup** – Remove the legacy `IMGconsole_32-bit/` tools and `src/assets/build.txt` once the Python build has proven itself.
 
 When developing further, remember: **`src/` is the source of truth.** Anything that only exists in `build/` or `IMGconsole_32-bit/` is disposable.
 
 ---
 
-## Publishing your fork
+## Publishing this fork
 
-This repository still points at the original `origin`. To publish your own continuation under your account while keeping the lineage visible:
+`origin` points to the continuation repository, `upstream` to the original project:
 
-```powershell
-# Keep the original as "upstream" so you can pull future changes
-git remote rename origin upstream
-git remote add origin https://github.com/<your-user>/GTAVLegacy.git
+```bash
+git remote -v
+# origin   https://github.com/baummarder/GTAVLegacyRW.git
+# upstream https://github.com/DanielSant0s/GTAVLegacy.git
 
-# Push your continuation
 git push -u origin main
 ```
 
-In the GitHub repository settings, set the description to something like:
+In the GitHub repository settings, use a description like:
 
 > Continuation of GTA V Legacy (PS2) by Daniel Santos – GTA V content for GTA San Andreas on PlayStation 2.
 
@@ -373,6 +377,14 @@ Do **not** publish ISO files or any game assets you are not allowed to redistrib
 ---
 
 ## Development notes
+
+### Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The smoke test creates a miniature ISO with the same structure, runs the full build and checks the resulting archives and image. It needs no game data.
 
 ### AI co-authors
 
@@ -385,7 +397,7 @@ Co-authored-by: OpenCode <noreply@opencode.ai>
 
 Activate it once per clone:
 
-```powershell
+```bash
 git config core.hooksPath .githooks
 ```
 
@@ -393,7 +405,7 @@ The hook skips merge/squash/fixup commits and never adds the trailers twice.
 
 ### Working on the build script
 
-```powershell
+```bash
 python buildiso.py --help          # no ISO or dependencies required
 python buildiso.py -v              # full build with debug output
 python buildiso.py --reuse-build   # skip re-extracting an existing build/
@@ -413,7 +425,8 @@ python buildiso.py --reuse-build   # skip re-extracting an existing build/
 ## Credits
 
 - **Daniel Santos** ([@DanielSant0s](https://github.com/DanielSant0s)) – original GTAVLegacy project, build script, asset conversion, PS2 overlays
-- **fastman92** – IMG Console
-- **UltraISO** – ISO creation
+- **@baummarder** – maintainer of this continuation
+- **fastman92** – IMG Console (used by the original build, now replaced by `imgtool.py`)
+- **UltraISO** – ISO creation (used by the original build, now replaced by `pycdlib`)
 - **pycdlib**, **py7zr** – Python libraries for ISO and 7z handling
 - **DeepSeek V4.1 Flash** and **OpenCode** – documentation, build tooling and maintenance of this continuation
