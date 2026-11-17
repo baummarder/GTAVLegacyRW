@@ -57,14 +57,15 @@ Wenn du auf diesem Projekt aufbaust, halte die Historie sichtbar und nenne den O
 
 ## Was das Projekt macht
 
-`buildiso.py` ist der Kern des Projekts. Es:
+`build.py` ist das zentrale Build-Tool. Ein Befehl führt alle Stages aus `buildiso.py` aus:
 
 1. prüft, ob das Original-ISO vorhanden und unverändert ist (MD5/SHA1),
 2. entpackt das ISO in den Ordner `build/`,
 3. kopiert die eigenen Dateien aus `src/` über das Original,
 4. entpackt die geteilten `STREAMS.7z.*`-Archive (GTA-V-Radiosender als PS2-Audio-Streams),
 5. mischt die konvertierten Assets mit einem eingebauten IMG-Writer in `gta3.img` und `gta_int.img`,
-6. baut mit `pycdlib` das fertige ISO.
+6. baut mit `pycdlib` das fertige ISO,
+7. öffnet das fertige ISO erneut und prüft die wichtigsten Einträge.
 
 Zusätzlich liegen im Repo PS2-Binärpatches (`src/overlays/*.NM`, `src/plugins/*.dep`), die das Spiel auf Konsolen-Ebene erweitern (u. a. CLEO-Support und eigene Opcodes).
 
@@ -108,7 +109,8 @@ Hast du eine andere (bereits gemoddete) Version, nutze `--allow-modded` oder set
 ## Schnellstart
 
 ```bash
-# 1. Abhängigkeiten installieren
+# 1. Abhängigkeiten installieren (oder vom Tool installieren lassen:
+#    python build.py deps --install-deps)
 pip install -r requirements.txt
 
 # 2. Original-ISO in den Projektordner legen
@@ -118,7 +120,16 @@ pip install -r requirements.txt
 # 3. config.ini prüfen (siehe unten)
 
 # 4. Bauen
-python buildiso.py
+python build.py
+```
+
+Das Tool sagt dir vorher, was fehlt:
+
+```bash
+python build.py check      # Umgebung, Pakete, freier Speicher, ISO-Prüfsumme
+python build.py deps       # fehlende Python-Pakete auflisten
+python build.py info       # aufgelöste Pfade und Einstellungen
+python build.py stages     # alle Build-Stages auflisten
 ```
 
 Unter Windows reicht der PowerShell-Wrapper alle Argumente weiter:
@@ -133,6 +144,33 @@ Das fertige Image heißt laut `config.ini` (Standard `GTA V Legacy Closed Alpha.
 
 ## Kommandozeile
 
+### Befehle
+
+| Befehl | Beschreibung |
+|---|---|
+| `all` (Standard) | Alle Stages aus der Tabelle unten ausführen. |
+| `iso` | Wie `all`. |
+| `check` | Nur die Preflight-Stage (Pakete, Pfade, freier Speicher, ISO-Prüfsumme). |
+| `deps` | Fehlende Python-Pakete anzeigen. Mit `--install-deps` werden sie per pip installiert. |
+| `stages` | Alle Stages mit ihren Keys auflisten. |
+| `info` | Aufgelöste Pfade, Stream-Teile und Paketstatus anzeigen. |
+| `clean` | Build-Ordner und Ausgabe-ISO löschen. |
+
+### Stages
+
+| Key | Was er macht |
+|---|---|
+| `preflight` | Konfiguration, Python-Pakete, freien Speicher und ISO-Prüfsumme prüfen. |
+| `prepare` | Sauberen Build-Ordner anlegen (oder vorhandenen behalten). |
+| `extract` | Original-ISO in den Build-Ordner entpacken. |
+| `overlay` | `src/` über das entpackte ISO kopieren. |
+| `audio` | `STREAMS.7z.*`-Teile zusammenfügen und entpacken. |
+| `images` | Assets in `gta3.img` und `gta_int.img` mischen. |
+| `package` | Build-Ordner als ISO9660-Level-1-Image bauen. |
+| `verify` | Fertiges ISO erneut öffnen und Inhalt prüfen. |
+
+### Optionen
+
 Jede Option überschreibt den passenden Wert aus `config.ini`.
 
 | Option | Beschreibung |
@@ -142,13 +180,27 @@ Jede Option überschreibt den passenden Wert aus `config.ini`.
 | `--config PATH` | Zu lesende Konfigurationsdatei (Standard `config.ini`). |
 | `--project-dir PATH` | Quellordner mit den Mod-Dateien (Standard `./src`). |
 | `--build-dir PATH` | Arbeitsordner für das entpackte ISO (Standard `./build`). |
+| `--only STAGE[,STAGE...]` | Nur diese Stages ausführen. |
+| `--skip STAGE[,STAGE...]` | Diese Stages überspringen. |
 | `--allow-modded` | Prüfsummen-Prüfung des ISOs überspringen. |
 | `--reuse-build` | Vorhandene Extraktion wiederverwenden statt neu zu entpacken. |
 | `--clean` | Sauberen Build erzwingen (Build-Ordner löschen). Standard, außer `--reuse-build` ist gesetzt. |
+| `--install-deps` | Python-Pakete aus `requirements.txt` vor dem Lauf installieren. |
+| `--dry-run` | Plan anzeigen, ohne etwas zu verändern. |
 | `-v`, `--verbose` | Debug-Logging inkl. jeder hinzugefügten Datei. |
 | `-h`, `--help` | Alle Optionen anzeigen. |
 
-Das Skript endet mit `0` bei Erfolg und `1` bei einem Build-Fehler (mit lesbarer Meldung statt Traceback).
+Beispiele:
+
+```bash
+python build.py --only preflight,prepare,extract   # nach dem Entpacken stoppen
+python build.py --skip audio                       # ohne Radio-Streams bauen
+python build.py --dry-run                          # nur den Plan zeigen
+```
+
+`python buildiso.py` funktioniert weiterhin aus Kompatibilitätsgründen und führt alle Stages aus; `python build.py` ist der empfohlene Einstiegspunkt.
+
+Das Tool endet mit `0` bei Erfolg und `1` bei einem Build-Fehler (mit lesbarer Meldung statt Traceback).
 
 ---
 
@@ -179,38 +231,50 @@ Das Skript schreibt `config.ini` nicht mehr zurück; der alte Abschnitt `[SAVED_
 
 ## Wie der Build abläuft
 
-`buildiso.py` führt der Reihe nach aus:
+`build.py` führt die Stages aus `buildiso.py` in dieser Reihenfolge aus (`--only`/`--skip` ändern das):
 
-1. **Eingabe-ISO prüfen** – Existenz + optional MD5/SHA1. Das passiert *bevor* etwas gelöscht wird, damit ein Tippfehler keine bestehende Extraktion vernichtet.
+1. **Preflight** – Projektordner, Python-Pakete, freier Speicher und Eingabe-ISO (Existenz + optional MD5/SHA1). Das passiert *bevor* etwas gelöscht wird, damit ein Tippfehler keine bestehende Extraktion vernichtet.
 2. **Build-Ordner vorbereiten** – `build/` wird entfernt (außer bei Wiederverwendung) und neu angelegt.
 3. **ISO entpacken** – rekursiv nach `build/` via `pycdlib`.
 4. **Mod-Dateien kopieren** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/` sowie die Inhalte von `overlays/`. Nicht ins ISO gehörende Altlasten (`models/gta3_1.img`, `movies/`) werden entfernt.
 5. **Audio-Streams entpacken** – alle `STREAMS.7z.*`-Teile in `src/audio/STREAMS/` werden zu `result.7z` zusammengefügt, entpackt und das Archiv gelöscht.
 6. **IMG-Archive neu bauen** – jede Datei unter `src/assets/` wird von `imgtool.py` in `gta3.img`/`gta_int.img` gemischt: vorhandene Einträge werden ersetzt, neue angehängt. Die Archive werden Sektor für Sektor neu geschrieben und müssen nie komplett in den Speicher.
 7. **ISO schreiben** – `pycdlib` erzeugt aus `build/` ein frisches ISO9660-Level-1-Image.
-8. **Ergebnis prüfen** – das fertige ISO muss existieren und nicht leer sein.
+8. **Ergebnis prüfen** – das ISO wird erneut geöffnet und muss `SYSTEM.CNF`, `SLUS_209.46`, `MODELS/GTA3.IMG` und `MODELS/GTA_INT.IMG` enthalten; Datei- und Ordneranzahl werden ausgegeben.
 
 Erwartete Ausgabe (grob):
 
 ```
-GTA V Legacy builder v0.3
+GTA V Legacy builder v0.4
       Project: src
       Build:   build
-[1/8] Checking input ISO ...
+      Output:  GTA V Legacy Closed Alpha.iso
+
+[1/8] Checking configuration and input ISO ...
       ISO: Grand Theft Auto - San Andreas (USA) (v1.03).iso
+      Free space (build folder): 120.4 GiB
+      done in 3.1 s
 [2/8] Preparing build folder ...
+      done in 8 ms
 [3/8] Extracting ISO ...
+      done in 42.6 s
 [4/8] Copying mod files ...
+      done in 2.4 s
 [5/8] Unpacking audio streams ...
+      done in 55.1 s
 [6/8] Rebuilding IMG archives ...
       gta3.img: 10632 entries (412 replaced, 96 added, 1.1 GiB)
       gta_int.img: 1221 entries (18 replaced, 0 added, 98.0 MiB)
+      done in 1 min 12 s
 [7/8] Writing ISO ...
       Packaging 78 files ...
+      done in 2 min 3 s
 [8/8] Verifying output ...
       GTA V Legacy Closed Alpha.iso (4.2 GiB)
+      78 files, 24 folders
+      done in 1.2 s
 
-Done.
+Done. 8 stage(s) in 5 min 14 s.
 ```
 
 Hinweise zu den Formaten der Python-Implementierung:
@@ -225,9 +289,10 @@ Hinweise zu den Formaten der Python-Implementierung:
 
 ```
 GTAVLegacy/
-├─ buildiso.py               # Build-Skript (Einstiegspunkt, CLI)
+├─ build.py                  # Zentrales Build-Tool (Einstiegspunkt, CLI)
+├─ buildiso.py               # Build-Stages: preflight … verify (auch direkt nutzbar)
 ├─ imgtool.py                # IMG-(VER2-)Reader/Writer, reines Python
-├─ build.ps1                 # PowerShell-Wrapper, reicht Argumente weiter
+├─ build.ps1                 # PowerShell-Wrapper, reicht Argumente an build.py weiter
 ├─ config.ini                # Pfade & Optionen
 ├─ requirements.txt          # pycdlib, py7zr
 ├─ tests/test_smoke.py       # End-to-End-Test mit Fake-ISO
@@ -321,6 +386,8 @@ parts = collect_stream_parts(project / "audio" / "STREAMS")
 Du kannst Teile frei hinzufügen oder entfernen – es gibt keine `range()`-Konstante mehr zu pflegen. Hat die Nummerierung Lücken, gibt der Build eine Warnung aus statt still kaputtes Audio zu erzeugen.
 
 Zum Erzeugen eigener Streams liegt `Wav 2 GTA V Legacy PS2.exe` im Repo-Root (Windows). Konvertiere damit WAV-Dateien und lege das Ergebnis in `src/audio/STREAMS/` ab.
+
+`sfx-tool/`, `music-installer/` und `IMGconsole_32-bit/` sind Legacy-Authoring-Helfer aus dem Originalprojekt (nur Windows). Sie werden zum ISO-Build **nicht** benötigt: `build.py` ersetzt die IMG Console und nutzt die vorbereiteten Audiodateien aus `src/` direkt.
 
 Fehlt der Ordner komplett, warnt der Build und läuft ohne eigenes Audio weiter.
 
@@ -425,9 +492,12 @@ Der Hook überspringt Merge-/Squash-/Fixup-Commits und fügt die Trailer nie dop
 ### Am Build-Skript arbeiten
 
 ```bash
-python buildiso.py --help          # ohne ISO oder Abhängigkeiten
-python buildiso.py -v              # kompletter Build mit Debug-Ausgabe
-python buildiso.py --reuse-build   # vorhandenes build/ nicht neu entpacken
+python build.py --help            # ohne ISO oder Abhängigkeiten
+python build.py --dry-run         # Stage-Plan zeigen
+python build.py -v                # kompletter Build mit Debug-Ausgabe
+python build.py --skip audio      # ohne Radio-Streams bauen
+python build.py --reuse-build     # vorhandenes build/ nicht neu entpacken
+python build.py stages            # Stage-Keys auflisten
 ```
 
 ---
