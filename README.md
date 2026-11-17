@@ -415,7 +415,7 @@ python buildiso.py --reuse-build   # skip re-extracting an existing build/
 
 ## Legal
 
-- The code in this repo is licensed under the **MIT License** (see `LICENSE`, © 2023 Daniel Santos).
+- The code in this repo is licensed under the **MIT License** (see `LICENSE`, © 2023 Daniel Santos, © 2026 Baummarder).
 - **GTA San Andreas** and **GTA V**, along with all assets, are property of **Rockstar Games / Take-Two Interactive**.
 - This repo contains **no** complete game and must not be redistributed as one. You need a legally acquired copy of GTA San Andreas (PS2).
 - This is an unofficial fan project and is not affiliated with Rockstar Games.
