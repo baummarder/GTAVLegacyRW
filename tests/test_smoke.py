@@ -10,12 +10,15 @@ structure, runs the complete build and checks the resulting image.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import logging
 import struct
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -87,6 +90,46 @@ def iso_children(iso, iso_path: str = "/") -> list[str]:
     return sorted(names)
 
 
+def make_fixture(work: Path) -> tuple[Path, Path]:
+    """Create a miniature ISO and the matching project folder."""
+    gta3_source = work / "source-gta3.img"
+    make_img(gta3_source, {"LANDSTAL.DFF": b"old-model", "KEEP.TXD": b"keep"})
+    interior_source = work / "source-int.img"
+    make_img(interior_source, {"MUNATION.TXD": b"shop"})
+
+    original_iso = work / "game.iso"
+    make_iso(
+        original_iso,
+        {
+            "SYSTEM.CNF": b"BOOT2 = cdrom0:\\SLUS_209.46;1\r\n",
+            "SLUS_209.46": b"fake-elf" * 16,
+            "MODELS/GTA3.IMG": gta3_source.read_bytes(),
+            "MODELS/GTA_INT.IMG": interior_source.read_bytes(),
+            "MODELS/GTA3_1.IMG": b"should-be-dropped",
+            "MOVIES/LOGO.PSS": b"should-be-dropped",
+            "DATA/HANDLING.CFG": b"original-handling",
+        },
+    )
+
+    project = work / "project"
+    (project / "models").mkdir(parents=True)
+    (project / "models" / "gta3.img").write_bytes(gta3_source.read_bytes())
+    (project / "models" / "gta_int.img").write_bytes(interior_source.read_bytes())
+    (project / "data").mkdir()
+    (project / "data" / "HANDLING.CFG").write_bytes(b"patched-handling")
+
+    vehicle = project / "assets" / "Vehicles" / "Cars" / "Landstal"
+    vehicle.mkdir(parents=True)
+    (vehicle / "landstal.dff").write_bytes(b"NEW-MODEL-DATA")
+    (vehicle / "notes.txt").write_bytes(b"ignored documentation")
+
+    interior = project / "assets" / "Interiors"
+    interior.mkdir(parents=True)
+    (interior / "new_interior.txd").write_bytes(b"interior-texture")
+
+    return original_iso, project
+
+
 class ImgToolTest(unittest.TestCase):
     def test_roundtrip_replace_and_add(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -145,42 +188,7 @@ class BuildTest(unittest.TestCase):
     def test_full_build(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary)
-
-            # Two archives: one with a model that will be replaced, one interior.
-            gta3_source = work / "source-gta3.img"
-            make_img(gta3_source, {"LANDSTAL.DFF": b"old-model", "KEEP.TXD": b"keep"})
-            interior_source = work / "source-int.img"
-            make_img(interior_source, {"MUNATION.TXD": b"shop"})
-
-            original_iso = work / "game.iso"
-            make_iso(
-                original_iso,
-                {
-                    "SYSTEM.CNF": b"BOOT2 = cdrom0:\\SLUS_209.46;1\r\n",
-                    "SLUS_209.46": b"fake-elf" * 16,
-                    "MODELS/GTA3.IMG": gta3_source.read_bytes(),
-                    "MODELS/GTA_INT.IMG": interior_source.read_bytes(),
-                    "MODELS/GTA3_1.IMG": b"should-be-dropped",
-                    "MOVIES/LOGO.PSS": b"should-be-dropped",
-                    "DATA/HANDLING.CFG": b"original-handling",
-                },
-            )
-
-            project = work / "project"
-            (project / "models").mkdir(parents=True)
-            (project / "models" / "gta3.img").write_bytes(gta3_source.read_bytes())
-            (project / "models" / "gta_int.img").write_bytes(interior_source.read_bytes())
-            (project / "data").mkdir()
-            (project / "data" / "HANDLING.CFG").write_bytes(b"patched-handling")
-
-            vehicle = project / "assets" / "Vehicles" / "Cars" / "Landstal"
-            vehicle.mkdir(parents=True)
-            (vehicle / "landstal.dff").write_bytes(b"NEW-MODEL-DATA")
-            (vehicle / "notes.txt").write_bytes(b"ignored documentation")
-
-            interior = project / "assets" / "Interiors"
-            interior.mkdir(parents=True)
-            (interior / "new_interior.txd").write_bytes(b"interior-texture")
+            original_iso, project = make_fixture(work)
 
             output = work / "out.iso"
             options = [
@@ -315,6 +323,35 @@ class CliTest(unittest.TestCase):
             )
 
             self.assertEqual(code, 0)
+
+    def test_wizard_build(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            original_iso, project = make_fixture(work)
+            output = work / "wizard.iso"
+
+            answers = [
+                str(original_iso),  # ISO path
+                str(output),        # output ISO
+                "n",                # do not verify the checksum
+                "n",                # do not skip the radio streams
+                "y",                # start the build
+                "n",                # do not open the output folder
+            ]
+
+            with mock.patch("builtins.input", side_effect=answers), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                code = build.main(
+                    [
+                        "wizard",
+                        "--config", str(ROOT / "config.ini"),
+                        "--project-dir", str(project),
+                        "--build-dir", str(work / "build"),
+                    ]
+                )
+
+            self.assertEqual(code, 0)
+            self.assertTrue(output.is_file())
 
     def test_unknown_stage_fails(self) -> None:
         code = build.main(["all", "--only", "nope"])

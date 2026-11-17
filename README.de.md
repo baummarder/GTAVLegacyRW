@@ -49,7 +49,7 @@ Dieses Projekt ist keine Neuentwicklung, sondern die **Weiterführung (Legacy-Fo
 | **Maintainer** | [@baummarder](https://github.com/baummarder) |
 | **Lizenz** | MIT für den Code (siehe `LICENSE`, © 2023 Daniel Santos) |
 
-Die 15 ursprünglichen Commits (2023–2024) bleiben unverändert erhalten und sind weiterhin von Daniel Santos verfasst. Alle Änderungen dieser Weiterführung sind zusätzliche Commits obendrauf; jeder davon nennt die verwendete KI-Unterstützung über `Co-authored-by`-Trailer.
+Die 15 ursprünglichen Commits (2023–2024) bleiben unverändert erhalten und sind weiterhin von Daniel Santos verfasst. Änderungen dieser Weiterführung kommen als zusätzliche Commits hinzu. KI-Co-Autoren werden bei Bedarf pro Commit genannt.
 
 Wenn du auf diesem Projekt aufbaust, halte die Historie sichtbar und nenne den Originalautor.
 
@@ -113,15 +113,14 @@ Hast du eine andere (bereits gemoddete) Version, nutze `--allow-modded` oder set
 #    python build.py deps --install-deps)
 pip install -r requirements.txt
 
-# 2. Original-ISO in den Projektordner legen
-#    Dateiname muss zu config.ini passen, z. B.:
-#    "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
-
-# 3. config.ini prüfen (siehe unten)
-
-# 4. Bauen
+# 2. Interaktiven Assistenten starten (ISO per Drag & Drop möglich)
 python build.py
+
+# Oder nicht-interaktiv mit explizitem ISO:
+python build.py --iso "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
 ```
+
+Der Assistent führt durch ISO, Ausgabename, Prüfsumme und Build-Optionen.
 
 Das Tool sagt dir vorher, was fehlt:
 
@@ -148,8 +147,9 @@ Das fertige Image heißt laut `config.ini` (Standard `GTA V Legacy Closed Alpha.
 
 | Befehl | Beschreibung |
 |---|---|
-| `all` (Standard) | Alle Stages aus der Tabelle unten ausführen. |
+| `all` (Standard) | Interaktiver Assistent im Terminal oder direkter Build mit `--iso` / `--non-interactive`. |
 | `iso` | Wie `all`. |
+| `wizard` | Interaktiven Build-Assistenten explizit starten. |
 | `check` | Nur die Preflight-Stage (Pakete, Pfade, freier Speicher, ISO-Prüfsumme). |
 | `deps` | Fehlende Python-Pakete anzeigen. Mit `--install-deps` werden sie per pip installiert. |
 | `stages` | Alle Stages mit ihren Keys auflisten. |
@@ -187,12 +187,17 @@ Jede Option überschreibt den passenden Wert aus `config.ini`.
 | `--clean` | Sauberen Build erzwingen (Build-Ordner löschen). Standard, außer `--reuse-build` ist gesetzt. |
 | `--install-deps` | Python-Pakete aus `requirements.txt` vor dem Lauf installieren. |
 | `--dry-run` | Plan anzeigen, ohne etwas zu verändern. |
+| `--non-interactive` | Niemals den interaktiven Assistenten starten; nur config.ini und CLI-Optionen verwenden. |
 | `-v`, `--verbose` | Debug-Logging inkl. jeder hinzugefügten Datei. |
 | `-h`, `--help` | Alle Optionen anzeigen. |
 
 Beispiele:
 
 ```bash
+python build.py                              # interaktiver Assistent
+python build.py wizard                       # dasselbe, explizit
+python build.py --non-interactive            # direkter Build mit config.ini
+python build.py --iso path/to/game.iso       # direkter Build mit ISO
 python build.py --only preflight,prepare,extract   # nach dem Entpacken stoppen
 python build.py --skip audio                       # ohne Radio-Streams bauen
 python build.py --dry-run                          # nur den Plan zeigen
@@ -296,7 +301,7 @@ GTAVLegacy/
 ├─ config.ini                # Pfade & Optionen
 ├─ requirements.txt          # pycdlib, py7zr
 ├─ tests/test_smoke.py       # End-to-End-Test mit Fake-ISO
-├─ .githooks/                # prepare-commit-msg-Hook (Co-Author-Trailer)
+├─ .githooks/                # optionaler prepare-commit-msg-Co-Author-Hook
 ├─ IMGconsole_32-bit/        # Legacy: fastman92 IMG Console, ungenutzt
 ├─ music-installer/          # Legacy: GTA-SA-Musik-/Audio-Installer-Tools
 ├─ legalize/                 # normalisiertes GTA-V-Audio (Cutscenes, Stimmen, Musik)
@@ -474,24 +479,26 @@ Der Smoke-Test erzeugt ein Miniatur-ISO mit derselben Struktur, führt den kompl
 
 ### KI-Co-Autoren
 
-Diese Weiterführung entsteht mit KI-Unterstützung. Ein `prepare-commit-msg`-Hook in `.githooks/` hängt die Co-Author-Trailer an jeden Commit:
+Die Identitäten von Devin und OpenCode stehen für Commits bereit, zu denen sie beigetragen haben. Der `prepare-commit-msg`-Hook fügt sie standardmäßig nicht hinzu. Für einen einzelnen Commit kannst du ihn über `GTAV_ADD_AI_COAUTHORS=1` in dessen Umgebung aktivieren:
 
 ```
+Co-authored-by: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>
 Co-authored-by: opencode-agent[bot] <opencode-agent[bot]@users.noreply.github.com>
-Co-authored-by: DeepSeek <service@deepseek.com>
 ```
 
-Einmal pro Clone aktivieren:
+Den Hook einmal pro Clone aktivieren:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-Der Hook überspringt Merge-/Squash-/Fixup-Commits und fügt die Trailer nie doppelt hinzu.
+Die Identitäten bleiben aus Commits heraus, sofern du nicht `GTAV_ADD_AI_COAUTHORS=1` für einen Commit setzt oder die Trailer selbst einfügst. Der Hook überspringt Merge-/Squash-/Fixup-Commits und überschreibt keine vorhandenen Co-Author-Trailer.
 
 ### Am Build-Skript arbeiten
 
 ```bash
+python build.py                 # interaktiver Assistent
+python build.py wizard --dry-run  # Stage-Plan zeigen
 python build.py --help            # ohne ISO oder Abhängigkeiten
 python build.py --dry-run         # Stage-Plan zeigen
 python build.py -v                # kompletter Build mit Debug-Ausgabe

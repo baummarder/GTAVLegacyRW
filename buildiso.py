@@ -48,6 +48,9 @@ BUF_SIZE = 65536
 EXPECTED_MD5 = "c383c015065f8060343032480928d08d"
 EXPECTED_SHA1 = "66cb01a8281cc132e023a1e52afc75d1fad3fbe1"
 
+#: Fallback when ``config.ini`` has no ``iso_name`` yet.
+DEFAULT_ISO_NAME = "Grand Theft Auto - San Andreas (USA) (v1.03).iso"
+
 #: Matches the split 7z parts, e.g. ``STREAMS.7z.001``.
 STREAM_PART_RE = re.compile(r"^STREAMS\.7z\.(\d+)$", re.IGNORECASE)
 
@@ -698,9 +701,7 @@ def load_settings(args: argparse.Namespace) -> Settings:
         return config.getboolean("DEFAULT", key, fallback=default)
 
     iso_setting = value("iso_name")
-    iso = args.iso or (resolve_path(iso_setting) if iso_setting else None)
-    if iso is None:
-        raise BuildError("No input ISO configured. Set iso_name in config.ini or pass --iso.")
+    iso = args.iso or (resolve_path(iso_setting) if iso_setting else Path(DEFAULT_ISO_NAME))
 
     output_setting = value("output", "GTA V Legacy Closed Alpha.iso")
     output = args.output or resolve_path(output_setting)

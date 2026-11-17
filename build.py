@@ -6,10 +6,16 @@ finished GTA V Legacy ISO. Every stage of the pipeline lives in
 ``buildiso.py``; this script is the single entry point that decides which
 stages run and in which order.
 
+Start it in a terminal and it asks for the original ISO (drag & drop works),
+the output name and the usual options, then builds:
+
+    python build.py
+
 Commands
 --------
-    python build.py                 # full build (check, extract, overlay, audio, IMG, ISO, verify)
-    python build.py iso             # same as above
+    python build.py                 # interactive wizard (asks for the ISO)
+    python build.py wizard          # same, explicitly
+    python build.py --iso PATH      # direct build, no questions
     python build.py check           # only validate the environment and the input ISO
     python build.py deps            # show missing Python packages
     python build.py deps --install-deps   # install them with pip
@@ -22,7 +28,7 @@ Examples
     python build.py --only preflight,prepare,extract
     python build.py --skip audio
     python build.py --iso "Grand Theft Auto - San Andreas (USA) (v1.03).iso" -v
-    python build.py --dry-run
+    python build.py --non-interactive    # never ask, use config.ini/--iso only
 
 Every option from ``buildiso.py`` is supported as well; run
 ``python build.py --help`` for the complete list.
@@ -32,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import shutil
 import subprocess
 import sys
@@ -42,7 +49,7 @@ import buildiso
 ROOT = Path(__file__).resolve().parent
 REQUIREMENTS = ROOT / "requirements.txt"
 
-COMMANDS = ("all", "iso", "check", "deps", "clean", "stages", "info")
+COMMANDS = ("all", "iso", "wizard", "check", "deps", "clean", "stages", "info")
 
 log = logging.getLogger("gtavlegacy")
 
@@ -58,7 +65,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         nargs="?",
         default="all",
         choices=COMMANDS,
-        help="What to do",
+        help="What to do (default: all, wizard in interactive terminal)",
     )
 
     buildiso.add_build_arguments(parser)
@@ -83,7 +90,202 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Show the plan without changing anything",
     )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Never start the wizard; use config.ini and the command line only",
+    )
     return parser.parse_args(argv)
+
+
+# --------------------------------------------------------------------------- #
+# Interactive wizard
+# --------------------------------------------------------------------------- #
+
+
+def is_interactive() -> bool:
+    try:
+        return sys.stdin.isatty() and sys.stdout.isatty()
+    except (AttributeError, ValueError):  # pragma: no cover - exotic streams
+        return False
+
+
+def clean_path(value: str) -> Path:
+    """Accept drag & drop paths with quotes, ``&`` prefixes, ``~`` and variables."""
+    text = value.strip().lstrip("&").strip().strip('"').strip("'").strip()
+    return Path(os.path.expandvars(os.path.expanduser(text)))
+
+
+def ask(prompt: str, default: str | None = None) -> str | None:
+    """Ask for a line. Returns ``None`` on EOF/Ctrl+C so callers can abort."""
+    suffix = f" [{default}]" if default else ""
+    try:
+        answer = input(f"  {prompt}{suffix}: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+    return answer or default
+
+
+def ask_yes_no(prompt: str, default: bool = True) -> bool:
+    hint = "Y/n" if default else "y/N"
+    while True:
+        try:
+            answer = input(f"  {prompt} ({hint}): ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return default
+        if not answer:
+            return default
+        if answer in {"y", "yes", "j", "ja"}:
+            return True
+        if answer in {"n", "no", "nein"}:
+            return False
+        print("  Please answer with yes or no.")
+
+
+def find_iso_candidates(settings: buildiso.Settings) -> list[Path]:
+    """Collect ISO files from the config, the working directory and the repo."""
+    candidates: list[Path] = []
+    seen: set[Path] = set()
+
+    def add(path: Path) -> None:
+        if not path.is_file():
+            return
+        try:
+            key = path.resolve()
+        except OSError:  # pragma: no cover - unusual on real systems
+            key = path
+        if key in seen:
+            return
+        seen.add(key)
+        candidates.append(path)
+
+    add(settings.iso)
+
+    for base in (Path.cwd(), ROOT):
+        for pattern in ("*.iso", "*.ISO"):
+            for path in sorted(base.glob(pattern)):
+                add(path)
+
+    return candidates[:8]
+
+
+def choose_iso(settings: buildiso.Settings) -> Path | None:
+    candidates = find_iso_candidates(settings)
+
+    print("\nGTA San Andreas (PS2) ISO")
+    if candidates:
+        print("  Found:")
+        for index, path in enumerate(candidates, 1):
+            print(f"    {index}. {path}  ({buildiso.human_size(path.stat().st_size)})")
+        print()
+    print("  Drag the ISO into this window or type/paste its path.")
+
+    while True:
+        default = str(candidates[0]) if candidates else None
+        answer = ask("ISO", default)
+        if answer is None:
+            return None
+        if not answer:
+            print("  Please enter an ISO path.")
+            continue
+        if candidates and answer.isdigit():
+            index = int(answer)
+            if 1 <= index <= len(candidates):
+                return candidates[index - 1]
+        path = clean_path(answer)
+        if path.is_file():
+            return path
+        print(f"  Not found: {path}")
+
+
+def choose_output(settings: buildiso.Settings) -> Path:
+    answer = ask("Output ISO", str(settings.output))
+    if not answer:
+        return settings.output
+    path = clean_path(answer)
+    if path.suffix.lower() != ".iso":
+        path = path.with_suffix(".iso")
+    return path
+
+
+def open_folder(path: Path) -> None:
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(path))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+    except OSError as exc:  # pragma: no cover - depends on the desktop
+        print(f"Could not open {path}: {exc}")
+
+
+def run_wizard(args: argparse.Namespace) -> int:
+    print(f"{buildiso.APP_NAME} v{buildiso.APP_VERSION} - interactive build")
+
+    settings = buildiso.load_settings(args)
+
+    iso = choose_iso(settings)
+    if iso is None:  # pragma: no cover - only on an empty stdin
+        return 1
+    settings.iso = iso
+    settings.output = choose_output(settings)
+
+    if not settings.allow_modded:
+        settings.allow_modded = not ask_yes_no(
+            "Verify the ISO checksum (only works for the unmodified NTSC-U v1.03 dump)?",
+            True,
+        )
+
+    if settings.build.exists():
+        settings.reuse_build = ask_yes_no(
+            f"Reuse the existing build folder ({settings.build})?", True
+        )
+
+    only = split_stages(args.only)
+    skip = split_stages(args.skip)
+    if only is not None or skip is not None:
+        selected = buildiso.select_stages(only, skip)
+    else:
+        selected = [stage.key for stage in buildiso.STAGES]
+        if ask_yes_no("Skip the radio streams (faster, no custom audio)?", False):
+            selected = [key for key in selected if key != "audio"]
+
+    print("\nSummary")
+    print(f"  Input ISO:    {settings.iso}")
+    print(f"  Output ISO:   {settings.output}")
+    print(f"  Build folder: {settings.build}")
+    print(f"  Checksum:     {'skip' if settings.allow_modded else 'verify'}")
+    print(f"  Reuse build:  {'yes' if settings.reuse_build else 'no'}")
+    print(f"  Stages:       {len(selected)}")
+    print()
+
+    if not ask_yes_no("Start the build?", True):
+        print("Cancelled.")
+        return 0
+
+    try:
+        buildiso.run(settings, selected)
+    except buildiso.BuildError as exc:
+        if "checksum mismatch" in str(exc).lower() and ask_yes_no(
+            "The ISO is not the expected dump. Continue without the checksum?", False
+        ):
+            settings.allow_modded = True
+            buildiso.run(settings, selected)
+        else:
+            raise
+
+    if settings.output.is_file() and ask_yes_no("Open the output folder?", False):
+        open_folder(settings.output.parent)
+
+    return 0
+
+
+# --------------------------------------------------------------------------- #
+# Commands
+# --------------------------------------------------------------------------- #
 
 
 def split_stages(value: str | None) -> list[str] | None:
@@ -202,6 +404,33 @@ def main(argv: list[str] | None = None) -> int:
         if args.install_deps and run_deps(install=True) != 0:
             return 1
 
+        if args.command == "wizard":
+            if args.dry_run:
+                selected = buildiso.select_stages(
+                    split_stages(args.only),
+                    split_stages(args.skip),
+                )
+                print_plan(selected)
+                return 0
+            return run_wizard(args)
+
+        if args.command in ("all", "iso"):
+            selected = buildiso.select_stages(
+                split_stages(args.only),
+                split_stages(args.skip),
+            )
+
+            if args.dry_run:
+                print_plan(selected)
+                return 0
+
+            if is_interactive() and not args.non_interactive and args.iso is None:
+                return run_wizard(args)
+
+            settings = buildiso.load_settings(args)
+            buildiso.run(settings, selected)
+            return 0
+
         settings = buildiso.load_settings(args)
 
         if args.command == "info":
@@ -213,18 +442,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "check":
-            selected = ["preflight"]
-        else:
-            selected = buildiso.select_stages(
-                split_stages(args.only),
-                split_stages(args.skip),
-            )
-
-        if args.dry_run:
-            print_plan(selected)
+            buildiso.run(settings, ["preflight"])
             return 0
-
-        buildiso.run(settings, selected)
     except buildiso.BuildError as exc:
         log.error("")
         log.error("Build failed: %s", exc)

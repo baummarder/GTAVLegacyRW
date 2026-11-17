@@ -1,12 +1,12 @@
 #!/bin/sh
 #
-# prepare-commit-msg hook: adds the project co-authors to every commit.
+# prepare-commit-msg hook: add the optional project AI co-authors only when
+# explicitly enabled for this commit with GTAV_ADD_AI_COAUTHORS=1.
 #
 # Installed via:
 #     git config core.hooksPath .githooks
 #
-# Written for the GTA V Legacy project, which is developed with AI assistance.
-# Delete this hook if you do not want the trailers.
+# The identities stay available here, but are not attached by default.
 
 msg_file="$1"
 msg_source="${2:-}"
@@ -18,6 +18,9 @@ esac
 
 [ -s "$msg_file" ] || exit 0
 
+# Opt in per commit. This avoids adding AI co-authors to every commit/push.
+[ "${GTAV_ADD_AI_COAUTHORS:-}" = "1" ] || exit 0
+
 # Skip empty messages (aborted commits, template only).
 grep -q '[^[:space:]]' "$msg_file" || exit 0
 
@@ -26,9 +29,10 @@ case "$(head -n 1 "$msg_file")" in
     "fixup! "*|"squash! "*|"amend! "*) exit 0 ;;
 esac
 
-# Never add the trailers twice (e.g. on --amend).
-if grep -qiE '^Co-authored-by: (DeepSeek|opencode-agent\[bot\])' "$msg_file"; then
+# Never add the trailers twice (e.g. on --amend) and never override explicit
+# contributor trailers supplied in the message.
+if grep -qiE '^Co-authored-by:' "$msg_file"; then
     exit 0
 fi
 
-printf '\nCo-authored-by: opencode-agent[bot] <opencode-agent[bot]@users.noreply.github.com>\nCo-authored-by: DeepSeek <service@deepseek.com>\n' >> "$msg_file"
+printf '\nCo-authored-by: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>\nCo-authored-by: opencode-agent[bot] <opencode-agent[bot]@users.noreply.github.com>\n' >> "$msg_file"
