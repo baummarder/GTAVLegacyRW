@@ -348,3 +348,12 @@ sfx-tool/AUDIO/STREAMS/NJ.PAK
 sfx-tool/AUDIO/STREAMS/RE.PAK
 sfx-tool/AUDIO/STREAMS/RG.PAK
 sfx-tool/AUDIO/STREAMS/TK.PAK
+
+# Build artifacts and tools (not part of the repository)
+/build/
+/UltraISO/
+/IMGconsole_32-bit/gta3/
+/IMGconsole_32-bit/gta_int/
+/IMGconsole_32-bit/*.img
+__pycache__/
+*.pyc
