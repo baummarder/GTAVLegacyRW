@@ -30,11 +30,14 @@ import importlib
 import io
 import logging
 import os
+import platform
 import re
 import shutil
-import struct
+import subprocess
 import sys
+import tempfile
 import time
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -82,8 +85,9 @@ DISK_SPACE_FACTOR = 2.5
 ISO_LOGICAL_BLOCK_SIZE = 2048
 PS2_DVD_TYPE_L_PATH_TABLE_LBA = 257
 PS2_DVD_TYPE_M_PATH_TABLE_LBA = 259
-PS2_DVD_PAD_PATH = "/000PS2PAD.BIN;1"
-PS2_DVD_PAD_SIZE = 256 * ISO_LOGICAL_BLOCK_SIZE
+PS2_UDF_VRS = ((18, b"\x00BEA01"), (19, b"\x00NSR02"), (20, b"\x00TEA01"))
+PS2_UDF_ANCHOR_LBA = 256
+PS2_SYSTEM_IDENTIFIER = b"PLAYSTATION"
 
 #: Entries shared by every finished build.
 REQUIRED_ISO_ENTRIES = (
@@ -585,105 +589,114 @@ def iso_path(relative: Path, *, is_file: bool) -> str:
     return f"{path};1" if is_file else path
 
 
-def patch_ps2_dvd_path_tables(output: Path, iso) -> None:
-    """Place ISO9660 path tables at the fixed sectors expected for PS2 DVDs."""
-    pvd = iso.pvd
-    if pvd.logical_block_size() != ISO_LOGICAL_BLOCK_SIZE:
-        raise BuildError("PS2 DVD images must use 2048-byte ISO9660 sectors.")
+def ps2iso_tools() -> tuple[Path, Path]:
+    """Return the bundled dumps2iso and mkps2iso executables for this platform."""
+    if sys.platform == "win32":
+        folder, suffix = "windows-x64", ".exe"
+    elif sys.platform == "darwin":
+        folder, suffix = "macos", ""
+    elif sys.platform.startswith("linux"):
+        folder, suffix = "linux-x64", ""
+    else:  # pragma: no cover - depends on the host platform
+        raise BuildError(f"PS2 ISO packaging is not supported on {sys.platform}.")
 
-    table_size = pvd.path_table_size()
-    if table_size > ISO_LOGICAL_BLOCK_SIZE:
-        raise BuildError(
-            "The ISO path table is larger than one PS2 DVD path-table sector; "
-            "this image layout is not supported."
+    machine = platform.machine().lower()
+    supported = (
+        {"amd64", "x86_64"}
+        if folder != "macos"
+        else {"amd64", "x86_64", "arm64", "aarch64"}
+    )
+    if machine not in supported:
+        raise BuildError(f"Bundled PS2 ISO tools do not support {platform.machine()}.")
+
+    tools_dir = Path(__file__).resolve().parent / "tools" / "mkps2iso" / folder
+    dumper = tools_dir / f"dumps2iso{suffix}"
+    writer = tools_dir / f"mkps2iso{suffix}"
+    missing = [str(path) for path in (dumper, writer) if not path.is_file()]
+    if missing:
+        raise BuildError("Bundled PS2 ISO tools are missing: " + ", ".join(missing))
+    return dumper, writer
+
+
+def run_packaging_tool(command: list[str], label: str) -> None:
+    """Run a bundled PS2 ISO utility and report its output on failure."""
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
-
-    pad_record = iso.get_record(iso_path=PS2_DVD_PAD_PATH)
-    pad_start = pad_record.extent_location()
-    pad_end = pad_start + (pad_record.data_length + ISO_LOGICAL_BLOCK_SIZE - 1) // ISO_LOGICAL_BLOCK_SIZE
-    if not (
-        pad_start <= PS2_DVD_TYPE_L_PATH_TABLE_LBA
-        and pad_start <= PS2_DVD_TYPE_M_PATH_TABLE_LBA
-        and pad_end > PS2_DVD_TYPE_M_PATH_TABLE_LBA
-    ):
-        raise BuildError(
-            "Could not reserve the PS2 DVD path-table sectors in the padding extent. "
-            "The directory tree is too large for the current image layout."
-        )
-
-    table_lba = pvd.path_table_location_le
-    table_mba = pvd.path_table_location_be
-    with output.open("r+b") as image:
-        image.seek(table_lba * ISO_LOGICAL_BLOCK_SIZE)
-        type_l_table = image.read(table_size)
-        image.seek(table_mba * ISO_LOGICAL_BLOCK_SIZE)
-        type_m_table = image.read(table_size)
-        if len(type_l_table) != table_size or len(type_m_table) != table_size:
-            raise BuildError("Could not read the ISO9660 path tables for PS2 DVD alignment.")
-
-        image.seek(PS2_DVD_TYPE_L_PATH_TABLE_LBA * ISO_LOGICAL_BLOCK_SIZE)
-        image.write(type_l_table.ljust(ISO_LOGICAL_BLOCK_SIZE, b"\0"))
-        image.seek(PS2_DVD_TYPE_M_PATH_TABLE_LBA * ISO_LOGICAL_BLOCK_SIZE)
-        image.write(type_m_table.ljust(ISO_LOGICAL_BLOCK_SIZE, b"\0"))
-
-        # PS2 DVD cdvdman expects Type-L/Type-M path tables at these fixed LBAs.
-        image.seek(pvd.extent_location() * ISO_LOGICAL_BLOCK_SIZE)
-        descriptor = bytearray(image.read(ISO_LOGICAL_BLOCK_SIZE))
-        if descriptor[1:6] != b"CD001":
-            raise BuildError("Could not locate the output ISO9660 primary volume descriptor.")
-        struct.pack_into("<I", descriptor, 140, PS2_DVD_TYPE_L_PATH_TABLE_LBA)
-        struct.pack_into("<I", descriptor, 144, 0)
-        struct.pack_into(">I", descriptor, 148, PS2_DVD_TYPE_M_PATH_TABLE_LBA)
-        struct.pack_into(">I", descriptor, 152, 0)
-        image.seek(pvd.extent_location() * ISO_LOGICAL_BLOCK_SIZE)
-        image.write(descriptor)
-        image.flush()
-        os.fsync(image.fileno())
+    except OSError as exc:
+        raise BuildError(f"Could not start {label}: {exc}") from exc
+    if result.returncode:
+        details = (result.stdout + "\n" + result.stderr).strip()
+        raise BuildError(f"{label} failed (exit code {result.returncode}).\n{details}")
+    if result.stdout.strip():
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
+        for line in lines[-5:]:
+            log.info("      %s", line)
+    if result.stderr.strip():
+        for line in result.stderr.splitlines():
+            log.warning("      %s", line)
 
 
 def write_iso(settings: Settings) -> None:
-    pycdlib = require_module("pycdlib", "pycdlib")
-
-    if settings.output.exists():
-        settings.output.unlink()
+    dumper, writer = ps2iso_tools()
     settings.output.parent.mkdir(parents=True, exist_ok=True)
-
-    iso = pycdlib.PyCdlib()
-    padding = io.BytesIO(bytes(PS2_DVD_PAD_SIZE))
-    added = 0
+    profile = settings.region or detect_iso_region(settings.iso)
+    serial = profile.executable.replace("_", "").replace(".", "")
+    serial = f"{serial[:4]}-{serial[4:]}"
+    disc_region = "europe" if profile.mode == "PAL" else "america"
+    temporary_path: Path | None = None
     try:
-        iso.new(
-            interchange_level=2,
-            vol_ident="GTAVLEGACY",
-            joliet=None,
-            rock_ridge=None,
+        fd, temporary_name = tempfile.mkstemp(
+            prefix=f"{settings.output.stem}.", suffix=".tmp.iso", dir=settings.output.parent
         )
-        # Keep LBA 257 and 259 inside an unused file extent so the PS2 DVD
-        # path tables can be written at their fixed locations without
-        # overwriting game data.
-        iso.add_fp(padding, PS2_DVD_PAD_SIZE, iso_path=PS2_DVD_PAD_PATH)
+        os.close(fd)
+        temporary_path = Path(temporary_name)
+        temporary_path.unlink()
 
-        for root, directories, files in os.walk(settings.build):
-            directories.sort()
-            relative_root = Path(root).relative_to(settings.build)
+        with tempfile.TemporaryDirectory(prefix="gtavlegacy-ps2iso-") as workspace:
+            xml_path = Path(workspace) / "build.xml"
+            run_packaging_tool(
+                [str(dumper), "-q", "-x", str(xml_path), str(settings.build.resolve())],
+                "dumps2iso",
+            )
+            if not xml_path.is_file():
+                raise BuildError("dumps2iso did not create the PS2 image project file.")
 
-            for directory in directories:
-                iso.add_directory(iso_path=iso_path(relative_root / directory, is_file=False))
+            try:
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
+                identifiers = root.find("identifiers")
+                if root.tag != "iso_project" or identifiers is None:
+                    raise ValueError("unexpected XML project layout")
+            except (ET.ParseError, ValueError) as exc:
+                raise BuildError(f"Could not prepare the PS2 image project: {exc}") from exc
 
-            for name in sorted(files):
-                local = Path(root) / name
-                iso.add_file(str(local), iso_path=iso_path(relative_root / name, is_file=True))
-                added += 1
-                log.debug("      + %s", relative_root / name)
+            root.set("image_name", settings.output.name)
+            root.set("serial", serial)
+            root.set("region", disc_region)
+            identifiers.set("system", "PLAYSTATION")
+            identifiers.set("application", "PLAYSTATION")
+            identifiers.set("volume", "SAN_ANDREAS")
+            tree.write(xml_path, encoding="utf-8", xml_declaration=True)
 
-        log.info("      Packaging %d files ...", added)
-        iso.write(str(settings.output))
-        patch_ps2_dvd_path_tables(settings.output, iso)
+            run_packaging_tool(
+                [str(writer), "-y", "-o", str(temporary_path), str(xml_path)],
+                "mkps2iso",
+            )
+
+        if not temporary_path.is_file() or temporary_path.stat().st_size == 0:
+            raise BuildError(f"PS2 ISO writer produced no image: {temporary_path}")
+        os.replace(temporary_path, settings.output)
+        temporary_path = None
     finally:
-        iso.close()
-
-    if not settings.output.is_file() or settings.output.stat().st_size == 0:
-        raise BuildError(f"Writing the ISO failed: {settings.output} is missing or empty.")
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -733,6 +746,7 @@ def check_environment(settings: Settings) -> None:
     if collect_stream_parts(settings.project / "audio" / "STREAMS"):
         packages.update(OPTIONAL_PACKAGES)
     require_packages(packages)
+    ps2iso_tools()
 
     settings.region = check_iso(settings.iso, settings.allow_modded)
     warn_free_space(settings, settings.iso.stat().st_size)
@@ -789,7 +803,6 @@ def verify_output(settings: Settings) -> None:
     required_entries = (
         *REQUIRED_ISO_ENTRIES,
         f"/{profile.executable};1",
-        PS2_DVD_PAD_PATH,
     )
     files = 0
     directories = 0
@@ -805,6 +818,21 @@ def verify_output(settings: Settings) -> None:
                 "The output ISO does not use the PS2 DVD path-table layout "
                 "(Type-L at sector 257, Type-M at sector 259)."
             )
+        if PS2_SYSTEM_IDENTIFIER not in iso.pvd.system_identifier:
+            raise BuildError("The output ISO is missing the PLAYSTATION system identifier.")
+        if not iso.has_udf():
+            raise BuildError("The output ISO is missing its PS2 DVD UDF filesystem.")
+
+        with output.open("rb") as image:
+            for sector, signature in PS2_UDF_VRS:
+                image.seek(sector * ISO_LOGICAL_BLOCK_SIZE)
+                if image.read(len(signature)) != signature:
+                    raise BuildError(
+                        f"The output ISO is missing the UDF volume sequence at sector {sector}."
+                    )
+            image.seek(PS2_UDF_ANCHOR_LBA * ISO_LOGICAL_BLOCK_SIZE)
+            if image.read(2) != b"\x02\x00":
+                raise BuildError("The output ISO is missing the UDF anchor at sector 256.")
 
         for required in required_entries:
             try:

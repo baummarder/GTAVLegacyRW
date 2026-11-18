@@ -71,7 +71,7 @@ If you build on this project, please keep the lineage visible and credit the ori
 3. copies the project's own files from `src/` over the extracted ISO,
 4. unpacks the split `STREAMS.7z.*` archives (GTA V radio stations as PS2 audio streams),
 5. merges the converted assets into `gta3.img` and `gta_int.img` with a built-in IMG writer,
-6. builds the final ISO with `pycdlib` and places its path tables at the PS2 DVD sectors,
+6. packages the final image with the bundled `mkps2iso` PS2 DVD tools,
 7. reopens the finished ISO and verifies the important entries.
 
 The repo also ships PS2 binary patches (`src/overlays/*.NM`, `src/plugins/*.dep`) that extend the game at console level (CLEO support and custom opcodes, among other things).
@@ -110,6 +110,7 @@ There are no verified gameplay screenshots of the current build in the repositor
 |---|---|
 | **Python 3.9+** | Tested with Python 3.14 on Windows. Invoke it as `python` (or `python3` on Linux/macOS). |
 | **Python packages** | `pip install -r requirements.txt` (installs `pycdlib` and `py7zr`) |
+| **PS2 DVD writer** | Bundled `mkps2iso` 1.1.1 tools for Windows, Linux and macOS |
 | **Original ISO** | US NTSC-U v1.03 (`SLUS_209.46`) or experimental PAL v1.00 (`SLES_529.27`). Other revisions and regions are not supported. |
 | **Free disk space** | Several GB – the ISO is extracted, the new ISO is written next to it, and audio archives are unpacked temporarily. |
 | **Operating system** | Windows, Linux or macOS. No external tools required. |
@@ -283,7 +284,7 @@ The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is 
 4. **Copy mod files** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/`, plus the contents of `overlays/`. Stale files that must not ship (`models/gta3_1.img`, `movies/`) are removed.
 5. **Unpack audio streams** – all `STREAMS.7z.*` parts in `src/audio/STREAMS/` are joined into `result.7z`, extracted, and the archive is deleted.
 6. **Rebuild the IMG archives** – every file under `src/assets/` is merged into `gta3.img` / `gta_int.img` by `imgtool.py`: entries that already exist are replaced, new ones are appended. The archives are rewritten sector by sector, so they never have to fit into memory.
-7. **Write the ISO** – `pycdlib` creates a fresh ISO9660 level 2 image from `build/`, retaining longer asset names. The writer places the Type-L and Type-M path tables at PS2 DVD sectors 257 and 259 and reserves that space in an internal padding file.
+7. **Write the ISO** – the bundled `mkps2iso` tools create a PS2 DVD image with its UDF filesystem, ISO9660 bridge, boot identifiers and region-matched boot logo. The Type-L and Type-M path tables are checked at sectors 257 and 259.
 8. **Verify the output** – the ISO is reopened and must contain `SYSTEM.CNF`, the detected region's executable, `MODELS/GTA3.IMG` and `MODELS/GTA_INT.IMG`; the file and folder counts are printed.
 
 Expected output (roughly):
@@ -324,7 +325,7 @@ Done. 8 stage(s) in 5 min 14 s.
 Notes on the formats used by the Python implementation:
 
 - IMG archives are **VER2** (GTA San Andreas). Entries are limited to 65535 sectors (~128 MiB) and 23 characters per name, exactly like the original tools. Violations abort the build with a clear message.
-- The ISO is written as **ISO9660 Level 2** to retain longer script and plugin filenames. For PS2 DVD boot, its Type-L and Type-M path tables are placed at sectors 257 and 259, as expected by the PS2 DVD filesystem; `000PS2PAD.BIN` reserves those sectors. Names are limited to 31 characters and `A-Z`, `0-9`, `_` and one dot. Raw PNG/PSD editor artwork and IDE metadata are left out of the game image. [PS2SDK CDVD source](https://github.com/ps2dev/ps2sdk/blob/master/iop/cdvd/cdvdman/src/cdvdman.c)
+- The final image is written by `mkps2iso` 1.1.1, which creates the PS2 DVD UDF structures and ISO9660 bridge. The build checks the UDF volume sequence and anchor, the `PLAYSTATION` system identifier, and path tables at sectors 257 and 259. The third-party tool and its license are in `tools/mkps2iso/`. Raw PNG/PSD editor artwork and IDE metadata are left out of the game image.
 - The ISO is rebuilt from the file contents, not by patching the original image byte by byte. The directory order may therefore differ from the retail disc.
 
 ---
@@ -339,6 +340,7 @@ GTAVLegacy/
 ├─ build.ps1                 # PowerShell wrapper, forwards arguments to build.py
 ├─ config.ini                # Paths & options
 ├─ requirements.txt          # pycdlib, py7zr
+├─ tools/mkps2iso/           # bundled PS2 DVD image tools and license
 ├─ tests/test_smoke.py       # end-to-end test with a fake ISO
 ├─ .githooks/                # optional prepare-commit-msg co-author hook
 ├─ IMGconsole_32-bit/        # legacy: fastman92 IMG Console, no longer used
@@ -380,7 +382,7 @@ The repository is English-first so that it can be worked on internationally:
 | [`README.de.md`](README.de.md) is the only German file. | It is an explicit translation, not the primary documentation. |
 | Game data keeps its original names (`HANDLING.CFG`, `VEHICLES.IDE`, `GTA3.IMG`, …). | The engine looks these up by name; renaming them breaks the game. |
 | Converted models and textures keep their asset names (`stretch.dff`, `comet.txd`, …). | IDE files and scripts reference them by name. |
-| The finished image uses ISO9660 Level 2. | Names up to 31 characters, uppercase, `A-Z 0-9 _` and one dot. |
+| PS2 DVD layout / filenames | Created by bundled `mkps2iso`; ISO9660 Level 2 names are limited to 31 characters. |
 
 Non-English legacy folders have been translated: `Instalador de Musicas` → `music-installer`, `legalize/legalize/falas` → `voices`, `legalize/legalize/musicas` → `music`, and the Russian folders under `src/assets/Cars to convert/` are English now as well. The non-English readmes shipped with the converted asset packs were translated too.
 
@@ -454,7 +456,7 @@ If the folder is missing entirely, the build warns and continues without custom 
 
 Fixed in this continuation compared to the original script:
 
-- Runs on Windows, Linux and macOS: UltraISO and fastman92 IMG Console are replaced by pure Python (`pycdlib` + `imgtool.py`).
+- Runs on Windows, Linux and macOS: image packaging uses bundled `mkps2iso`; IMG archive handling uses `imgtool.py`.
 - `build.ps1` no longer calls the non-existent `python3` on Windows.
 - `result.7z` is written fresh (`wb`) instead of appended (`ab`), so rebuilds cannot corrupt it.
 - Failures are reported as readable errors with exit code `1` instead of tracebacks.
@@ -562,6 +564,6 @@ python build.py stages            # list the stage keys
 - **Daniel Santos** ([@DanielSant0s](https://github.com/DanielSant0s)) – original GTAVLegacy project, build script, asset conversion, PS2 overlays
 - **@baummarder** – maintainer of this continuation
 - **fastman92** – IMG Console (used by the original build, now replaced by `imgtool.py`)
-- **UltraISO** – ISO creation (used by the original build, now replaced by `pycdlib`)
+- **mkps2iso** – PS2 DVD image creation (bundled under GPL-2.0; see `tools/mkps2iso/LICENSE`)
 - **pycdlib**, **py7zr** – Python libraries for ISO and 7z handling
 - **Devin**, **opencode-agent[bot]** and **DeepSeek** – AI assistance with documentation, build tooling and maintenance of this continuation
