@@ -12,6 +12,8 @@ The output is intended for emulators such as PCSX2 and PS2 hardware using OPL/Fr
 >
 > **This repository continues the legacy of [GTAVLegacy by Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy).** See [Project lineage](#project-lineage).
 
+**Current test build:** `GTA Legacy Alpha build 0.1.9`. Its startup sequence uses the GTA V clips in `src/intro/` in place of San Andreas's opening movies. It has been checked in PCSX2; real PS2 hardware still needs testing.
+
 **A personal note:** This project is currently at the bottom of my active to-do list. Other priorities come first for now.
 
 [Build your ISO](#quick-start) · [Requirements](#requirements) · [CLI reference](#command-line) · [Project lineage](#project-lineage) · [Deutsch](README.de.md)
@@ -82,6 +84,7 @@ The repo also ships PS2 binary patches (`src/overlays/*.NM`, `src/plugins/*.dep`
 |---|---|---|
 | Build pipeline | ✅ Implemented | Creates an ISO and checks its required files. |
 | NTSC-U v1.03 input | ✅ Accepted | The current build and patches target this release. |
+| GTA V boot clips | ✅ Included | `VLOGOS.RGM` and `VLOAD.RGM` replace the stock San Andreas startup movies; checked in PCSX2. |
 | PAL (`SLES_529.27`) | ⛔ Temporarily disabled | The PS2 startup screen appears, but the game does not continue. PAL investigation is isolated under `experimental/pal/`. |
 | Other regions/revisions | ⚪ Not supported | Use the supported US NTSC-U v1.03 release. |
 | In-game compatibility | ⚪ Not verified | A successful ISO build does not confirm that gameplay works on PCSX2 or PS2 hardware. |
@@ -156,14 +159,16 @@ In a terminal, `python build.py` opens the interactive wizard. It asks for the I
 To build without prompts, pass the ISO path directly:
 
 ```bash
-python build.py --iso "D:/Games/Grand Theft Auto - San Andreas.iso" --output "D:/Games/GTA V Legacy.iso"
+python build.py --iso "D:/Games/Grand Theft Auto - San Andreas.iso" --output "SLUS_209.46.GTA Legacy Alpha build 0.1.9.iso" --build-dir build-ntsc
 ```
 
 On Windows, the PowerShell wrapper is also available:
 
 ```powershell
-.\build.ps1 --iso "D:\Games\Grand Theft Auto - San Andreas.iso" --output "D:\Games\GTA V Legacy.iso"
+.\build.ps1 --iso "D:\Games\Grand Theft Auto - San Andreas.iso" --output "SLUS_209.46.GTA Legacy Alpha build 0.1.9.iso" --build-dir build-ntsc
 ```
+
+Keep the `SLUS_209.46` prefix when naming the ISO for OPL. `build-ntsc/` keeps this build's extracted files separate; a normal build removes and recreates whichever build folder you select.
 
 The output file is overwritten if it already exists. A normal build also recreates the working `build/` folder; use `--reuse-build` only when you intentionally want to reuse its extracted files.
 
