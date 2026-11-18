@@ -82,7 +82,7 @@ Zusätzlich liegen im Repo PS2-Binärpatches (`src/overlays/*.NM`, `src/plugins/
 |---|---|---|
 | Build-Pipeline | ✅ Implementiert | Erstellt ein ISO und prüft die erforderlichen Dateien. |
 | NTSC-U-v1.03-Eingabe | ✅ Akzeptiert | Build und Patches zielen auf diese Spielversion. |
-| PAL v1.00 (`SLES_529.27`) | 🟡 Experimenteller Build | Erkennung und ISO-Erstellung funktionieren; die PS2-Patches müssen noch auf echter Hardware geprüft werden. |
+| PAL v1.00 (`SLES_529.27`) | 🟡 Experimenteller Build | Erkennung und ISO-Erstellung funktionieren; NTSC-spezifische Overlays/Plugins werden bis zu ihrer Portierung ausgelassen. |
 | Andere PAL-Versionen | ⚪ Nicht unterstützt | Sie werden abgewiesen, bis Executable und Patches ein eigenes Profil haben. |
 | Kompatibilität im Spiel | ⚪ Nicht verifiziert | Ein erfolgreich erstelltes ISO bestätigt noch keine Spielbarkeit auf PCSX2 oder PS2-Hardware. |
 

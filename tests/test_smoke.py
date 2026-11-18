@@ -413,5 +413,38 @@ class IsoPathTest(unittest.TestCase):
         )
 
 
+class OverlayInstallTest(unittest.TestCase):
+    def test_pal_profile_removes_executable_specific_patches(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            project = root / "src"
+            build_dir = root / "build"
+
+            for name in ("intro", "text", "data", "models", "anim"):
+                (project / name).mkdir(parents=True)
+            for name in ("CONFIG", "SFX"):
+                (project / "audio" / name).mkdir(parents=True)
+            overlays = project / "overlays"
+            plugins = project / "plugins"
+            overlays.mkdir()
+            plugins.mkdir()
+            for name in ("INIT.NM", "FILELOAD.NM", "relocator.nm"):
+                (overlays / name).write_bytes(b"NTSC patch")
+                (build_dir / name).parent.mkdir(parents=True, exist_ok=True)
+                (build_dir / name).write_bytes(b"stale patch")
+            for name in ("cleo.dep", "plugins.ini"):
+                (plugins / name).write_bytes(b"NTSC plugin")
+                (build_dir / "plugins" / name).parent.mkdir(parents=True, exist_ok=True)
+                (build_dir / "plugins" / name).write_bytes(b"stale plugin")
+
+            buildiso.install_project_files(project, build_dir, include_console_patches=False)
+
+            self.assertFalse((build_dir / "INIT.NM").exists())
+            self.assertFalse((build_dir / "FILELOAD.NM").exists())
+            self.assertFalse((build_dir / "relocator.nm").exists())
+            self.assertFalse((build_dir / "plugins" / "cleo.dep").exists())
+            self.assertFalse((build_dir / "plugins" / "plugins.ini").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

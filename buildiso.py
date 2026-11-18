@@ -443,7 +443,9 @@ def extract_iso(src: Path, dst: Path) -> None:
         iso.close()
 
 
-def install_project_files(project: Path, build: Path) -> None:
+def install_project_files(
+    project: Path, build: Path, *, include_console_patches: bool = True
+) -> None:
     for name in ("intro", "text", "data"):
         copy_tree(project / name, build / name)
 
@@ -454,10 +456,25 @@ def install_project_files(project: Path, build: Path) -> None:
     for name in ("CONFIG", "SFX"):
         copy_tree(project / "audio" / name, build / "audio" / name)
 
-    for name in ("anim", "plugins"):
-        copy_tree(project / name, build / name)
+    copy_tree(project / "anim", build / "anim")
 
-    copy_tree_contents(project / "overlays", build)
+    if include_console_patches:
+        copy_tree(project / "plugins", build / "plugins")
+        copy_tree_contents(project / "overlays", build)
+    else:
+        # These modules and plugins contain hard-coded addresses for the
+        # US executable. Remove stale copies too when reusing an old build.
+        for patch in (project / "overlays").iterdir():
+            installed = build / patch.name
+            if installed.is_file():
+                installed.unlink()
+        for plugin in (project / "plugins").iterdir():
+            installed = build / "plugins" / plugin.name
+            if installed.is_file():
+                installed.unlink()
+        log.info(
+            "      Skipping executable-specific overlays and plugins for the experimental PAL profile."
+        )
 
     # Files that must not end up in the final ISO.
     for stale in (build / "models" / "gta3_1.img", build / "movies"):
@@ -767,7 +784,12 @@ def extract_stage(settings: Settings) -> None:
 
 
 def overlay_stage(settings: Settings) -> None:
-    install_project_files(settings.project, settings.build)
+    profile = settings.region or detect_iso_region(settings.iso)
+    install_project_files(
+        settings.project,
+        settings.build,
+        include_console_patches=not profile.experimental,
+    )
 
 
 def audio_stage(settings: Settings) -> None:
@@ -841,6 +863,24 @@ def verify_output(settings: Settings) -> None:
                 raise BuildError(
                     f"The generated ISO is missing {required.strip('/')}."
                 ) from exc
+
+        if profile.experimental:
+            disabled_patch_paths = [
+                *(Path(patch.name) for patch in (settings.project / "overlays").iterdir()),
+                *(
+                    Path("plugins") / plugin.name
+                    for plugin in (settings.project / "plugins").iterdir()
+                ),
+            ]
+            for relative in disabled_patch_paths:
+                try:
+                    iso.get_record(iso_path=iso_path(relative, is_file=True))
+                except Exception:
+                    continue
+                raise BuildError(
+                    f"Experimental PAL output must not include the unported patch "
+                    f"{relative.as_posix()}."
+                )
 
         pending = [iso.get_record(iso_path="/")]
         while pending:

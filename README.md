@@ -82,7 +82,7 @@ The repo also ships PS2 binary patches (`src/overlays/*.NM`, `src/plugins/*.dep`
 |---|---|---|
 | Build pipeline | ✅ Implemented | Creates an ISO and checks its required files. |
 | NTSC-U v1.03 input | ✅ Accepted | The current build and patches target this release. |
-| PAL v1.00 (`SLES_529.27`) | 🟡 Experimental build | Region detection and ISO packaging are available; the shared PS2 patch set still needs real-console validation. |
+| PAL v1.00 (`SLES_529.27`) | 🟡 Experimental build | Region detection and ISO packaging work; NTSC-specific console overlays/plugins are omitted until ported. |
 | Other PAL revisions | ⚪ Not supported | They are rejected until their executable and patches have a dedicated profile. |
 | In-game compatibility | ⚪ Not verified | A successful ISO build does not confirm that gameplay works on PCSX2 or PS2 hardware. |
 
