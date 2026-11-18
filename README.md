@@ -82,7 +82,8 @@ The repo also ships PS2 binary patches (`src/overlays/*.NM`, `src/plugins/*.dep`
 |---|---|---|
 | Build pipeline | ✅ Implemented | Creates an ISO and checks its required files. |
 | NTSC-U v1.03 input | ✅ Accepted | The current build and patches target this release. |
-| PAL releases | 🟡 Not supported | A separate patch port and real-console testing are still needed; see the [PAL roadmap](docs/PAL_SUPPORT.md). |
+| PAL v1.00 (`SLES_529.27`) | 🟡 Experimental build | Region detection and ISO packaging are available; the shared PS2 patch set still needs real-console validation. |
+| Other PAL revisions | ⚪ Not supported | They are rejected until their executable and patches have a dedicated profile. |
 | In-game compatibility | ⚪ Not verified | A successful ISO build does not confirm that gameplay works on PCSX2 or PS2 hardware. |
 
 Asset categories included:
@@ -109,20 +110,20 @@ There are no verified gameplay screenshots of the current build in the repositor
 |---|---|
 | **Python 3.9+** | Tested with Python 3.14 on Windows. Invoke it as `python` (or `python3` on Linux/macOS). |
 | **Python packages** | `pip install -r requirements.txt` (installs `pycdlib` and `py7zr`) |
-| **Original ISO** | *Grand Theft Auto - San Andreas (USA) (v1.03)* – NTSC-U. PAL and other regional versions are not supported. |
+| **Original ISO** | US NTSC-U v1.03 (`SLUS_209.46`) or experimental PAL v1.00 (`SLES_529.27`). Other revisions and regions are not supported. |
 | **Free disk space** | Several GB – the ISO is extracted, the new ISO is written next to it, and audio archives are unpacked temporarily. |
 | **Operating system** | Windows, Linux or macOS. No external tools required. |
 
 ### 🔐 ISO checksums
 
-By default the build only accepts this ISO:
+The US NTSC-U v1.03 profile is checked against this reference image:
 
 ```
 MD5:  c383c015065f8060343032480928d08d
 SHA1: 66cb01a8281cc132e023a1e52afc75d1fad3fbe1
 ```
 
-If your **US NTSC-U v1.03** ISO has been modified and its checksum no longer matches, pass `--allow-modded` or set `allow_modded = True` in `config.ini`. This skips the hash check only. PAL support needs a separate port of the executable patches and regional game data, followed by boot and gameplay testing; it is not currently available.
+The builder identifies the release from `SYSTEM.CNF` and its boot executable. The PAL v1.00 profile does not have a configured reference checksum, so pass `--allow-modded` or set `allow_modded = True` after confirming your own clean dump. This skips checksum verification; it does not bypass region or version detection. PAL output is experimental until its patches pass emulator and real-PS2 testing.
 
 See the [PAL support roadmap](docs/PAL_SUPPORT.md) for the porting and PS2 test plan.
 
@@ -138,9 +139,9 @@ python -m pip install -r requirements.txt
 
 ### 2. Add your original game ISO
 
-Use your legally obtained **GTA San Andreas (USA, NTSC-U v1.03) PS2 ISO**. Put it in the repository folder with the default filename from `config.ini`, or keep it elsewhere and pass its path with `--iso`.
+Use a legally obtained **GTA San Andreas (USA, NTSC-U v1.03)** or **PAL v1.00** PS2 ISO. The builder detects the region automatically. Put the ISO in the repository folder or pass its path with `--iso`.
 
-The default build checks the ISO's MD5 and SHA1 before it changes the build folder. Other versions are not supported by default.
+The build detects the region before changing the build folder. NTSC-U v1.03 is checked against its MD5/SHA1 reference; PAL v1.00 asks you to confirm the dump because no reference checksum is configured. Other versions are rejected.
 
 ### 3. Check the setup and build
 
@@ -188,7 +189,7 @@ The finished image uses the output path from `config.ini` unless you pass `--out
 | `all` (default) | Interactive wizard in a terminal, or direct build with `--iso` / `--non-interactive`. |
 | `iso` | Same as `all`. |
 | `wizard` | Run the interactive build wizard explicitly. |
-| `check` | Only run the preflight stage (packages, paths, free space, ISO checksum). |
+| `check` | Only run preflight (packages, paths, free space, region and checksum checks). |
 | `deps` | Show missing Python packages. With `--install-deps` they are installed via pip. |
 | `stages` | List all stages with their keys. |
 | `info` | Show the resolved paths, stream parts and package status. |
@@ -198,7 +199,7 @@ The finished image uses the output path from `config.ini` unless you pass `--out
 
 | Key | What it does |
 |---|---|
-| `preflight` | Validate config, Python packages, free space and the ISO checksum. |
+| `preflight` | Validate config, Python packages, free space, ISO region and checksum policy. |
 | `prepare` | Create a clean build folder (or keep an existing one). |
 | `extract` | Unpack the original ISO into the build folder. |
 | `overlay` | Overlay `src/` onto the extracted ISO. |
@@ -283,7 +284,7 @@ The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is 
 5. **Unpack audio streams** – all `STREAMS.7z.*` parts in `src/audio/STREAMS/` are joined into `result.7z`, extracted, and the archive is deleted.
 6. **Rebuild the IMG archives** – every file under `src/assets/` is merged into `gta3.img` / `gta_int.img` by `imgtool.py`: entries that already exist are replaced, new ones are appended. The archives are rewritten sector by sector, so they never have to fit into memory.
 7. **Write the ISO** – `pycdlib` creates a fresh ISO9660 level 2 image from `build/`, retaining the longer names used by added scripts and plugins.
-8. **Verify the output** – the ISO is reopened and must contain `SYSTEM.CNF`, `SLUS_209.46`, `MODELS/GTA3.IMG` and `MODELS/GTA_INT.IMG`; the file and folder counts are printed.
+8. **Verify the output** – the ISO is reopened and must contain `SYSTEM.CNF`, the detected region's executable, `MODELS/GTA3.IMG` and `MODELS/GTA_INT.IMG`; the file and folder counts are printed.
 
 Expected output (roughly):
 
@@ -440,7 +441,7 @@ If the folder is missing entirely, the build warns and continues without custom 
 
 | Problem | Cause / fix |
 |---|---|
-| Checksum error | Use the US NTSC-U v1.03 disc. For a modified copy of that same release, `--allow-modded` skips only the checksum check; other regions remain unsupported. |
+| Checksum or region error | Use US NTSC-U v1.03 or PAL v1.00. `--allow-modded` skips checksum verification; unsupported versions and regions are still rejected. |
 | `gta3.img` not found | The ISO extraction is incomplete – delete `build/` and rebuild. |
 | Stale assets in the ISO | `reuse_build = True` or `--reuse-build` was used. Run with `--clean`. |
 | `... cannot be stored in a plain ISO9660 image` | A name in `build/` is longer than 31 characters or contains unsupported characters. Rename it in `src/`. |

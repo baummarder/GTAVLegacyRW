@@ -231,13 +231,24 @@ def run_wizard(args: argparse.Namespace) -> int:
     if iso is None:  # pragma: no cover - only on an empty stdin
         return 1
     settings.iso = iso
+    settings.region = buildiso.detect_iso_region(iso)
     settings.output = choose_output(settings)
 
     if not settings.allow_modded:
-        settings.allow_modded = not ask_yes_no(
-            "Verify the ISO checksum (only works for the unmodified NTSC-U v1.03 dump)?",
-            True,
-        )
+        if settings.region.reference_checksums is None:
+            print(
+                f"  Detected: {settings.region.label}. No reference checksum is configured; "
+                "PAL patch compatibility is experimental."
+            )
+            if not ask_yes_no("Continue with checksum verification skipped?", False):
+                print("Cancelled.")
+                return 0
+            settings.allow_modded = True
+        else:
+            settings.allow_modded = not ask_yes_no(
+                f"Verify the checksum for {settings.region.label}?",
+                True,
+            )
 
     if settings.build.exists():
         settings.reuse_build = ask_yes_no(
@@ -255,6 +266,7 @@ def run_wizard(args: argparse.Namespace) -> int:
 
     print("\nSummary")
     print(f"  Input ISO:    {settings.iso}")
+    print(f"  Game region:  {settings.region.label}")
     print(f"  Output ISO:   {settings.output}")
     print(f"  Build folder: {settings.build}")
     print(f"  Checksum:     {'skip' if settings.allow_modded else 'verify'}")
@@ -375,11 +387,18 @@ def show_info(settings: buildiso.Settings) -> None:
     missing = buildiso.missing_packages(packages)
 
     iso_state = "missing"
+    region_state = "not detected"
     if settings.iso.is_file():
         iso_state = buildiso.human_size(settings.iso.stat().st_size)
+        try:
+            settings.region = buildiso.detect_iso_region(settings.iso)
+            region_state = settings.region.label
+        except buildiso.BuildError as exc:
+            region_state = f"unsupported ({exc})"
 
     print(f"{buildiso.APP_NAME} v{buildiso.APP_VERSION}\n")
     print(f"  Input ISO:    {settings.iso} ({iso_state})")
+    print(f"  Game region:  {region_state}")
     print(f"  Output ISO:   {settings.output}")
     print(f"  Project:      {settings.project}")
     print(f"  Build folder: {settings.build}")

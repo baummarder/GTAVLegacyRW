@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """GTA V Legacy build stages.
 
-Overlays the mod content from ``src/`` onto an unmodified GTA San Andreas
-(PS2, NTSC-U v1.03) ISO, rebuilds the ``.img`` archives and writes a new,
-patched ISO. Everything is done in pure Python, so the build runs on Windows,
-Linux and macOS without UltraISO or other external tools.
+Overlays the mod content from ``src/`` onto a supported GTA San Andreas
+(PS2) ISO, rebuilds the ``.img`` archives and writes a new image. US NTSC-U
+v1.03 is verified; PAL v1.00 is experimental. Everything is done in pure
+Python, so the build runs on Windows, Linux and macOS without UltraISO.
 
 This module owns the individual build stages and their order. Use ``build.py``
 for the central command line interface; ``python buildiso.py`` still works and
@@ -27,6 +27,7 @@ import collections
 import configparser
 import hashlib
 import importlib
+import io
 import logging
 import os
 import re
@@ -78,10 +79,9 @@ OPTIONAL_PACKAGES: dict[str, str] = {"py7zr": "py7zr"}
 #: Rough space estimate: input ISO + extracted build folder + output ISO.
 DISK_SPACE_FACTOR = 2.5
 
-#: Entries that every finished build must contain.
+#: Entries shared by every finished build.
 REQUIRED_ISO_ENTRIES = (
     "/SYSTEM.CNF;1",
-    "/SLUS_209.46;1",
     "/MODELS/GTA3.IMG;1",
     "/MODELS/GTA_INT.IMG;1",
 )
@@ -91,6 +91,38 @@ log = logging.getLogger("gtavlegacy")
 
 class BuildError(RuntimeError):
     """Raised when the build cannot continue."""
+
+
+@dataclass(frozen=True)
+class RegionProfile:
+    """A game release whose executable and regional mode are recognized."""
+
+    executable: str
+    label: str
+    version: str | None
+    mode: str | None
+    reference_checksums: tuple[str, str] | None = None
+    executable_sha1: str | None = None
+    experimental: bool = False
+
+
+REGION_PROFILES: dict[str, RegionProfile] = {
+    "SLUS_209.46": RegionProfile(
+        executable="SLUS_209.46",
+        label="US NTSC-U v1.03",
+        version="1.03",
+        mode="NTSC",
+        reference_checksums=(EXPECTED_MD5, EXPECTED_SHA1),
+    ),
+    "SLES_529.27": RegionProfile(
+        executable="SLES_529.27",
+        label="PAL v1.00 (experimental)",
+        version="1.00",
+        mode="PAL",
+        executable_sha1="d784af98d54771e15f79c2688f120be6a6a872dc",
+        experimental=True,
+    ),
+}
 
 
 @dataclass
@@ -103,6 +135,7 @@ class Settings:
     build: Path
     allow_modded: bool = False
     reuse_build: bool = False
+    region: RegionProfile | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -240,57 +273,134 @@ def collect_assets(folder: Path) -> list[Path]:
 # --------------------------------------------------------------------------- #
 
 
-def check_iso(src: Path, allow_modded: bool) -> None:
-    log.info("      ISO: %s", src)
-
-    if not src.is_file():
-        raise BuildError(
-            f"ISO not found: {src}\n"
-            "Put the original 'Grand Theft Auto - San Andreas (USA) (v1.03).iso' "
-            "next to this script or pass --iso."
-        )
-
-    # This project patches the US NTSC-U v1.03 executable. Skipping the hash
-    # check must not silently permit a different regional game executable.
+def detect_iso_region(src: Path) -> RegionProfile:
+    """Identify a supported release from SYSTEM.CNF and its boot executable."""
     pycdlib = require_module("pycdlib", "pycdlib")
     iso = pycdlib.PyCdlib()
     try:
         iso.open(str(src))
         try:
-            iso.get_record(iso_path="/SLUS_209.46;1")
+            system_buffer = io.BytesIO()
+            iso.get_file_from_iso_fp(system_buffer, iso_path="/SYSTEM.CNF;1")
+            system_text = system_buffer.getvalue().decode("ascii", "replace")
         except Exception as exc:
-            root_names = []
-            for record in iso.list_children(iso_path="/"):
-                if record is None or record.is_dot() or record.is_dotdot() or record.is_dir():
-                    continue
-                name = record.file_identifier().decode("ascii", "replace").split(";", 1)[0]
-                if re.match(r"^(?:SLUS|SLES|SCUS|SCES)_", name, re.IGNORECASE):
-                    root_names.append(name)
-            found = ", ".join(sorted(root_names)) or "no recognized executable"
+            raise BuildError("The ISO is missing a readable SYSTEM.CNF boot file.") from exc
+
+        boot_match = re.search(
+            r"(?im)^\s*BOOT2\s*=\s*cdrom0:[\\/]+([^;\s]+)(?:;\d+)?",
+            system_text,
+        )
+        boot_executable = None
+        if boot_match:
+            boot_executable = boot_match.group(1).replace("\\", "/").rsplit("/", 1)[-1].upper()
+
+        root_executables: list[str] = []
+        for record in iso.list_children(iso_path="/"):
+            if record is None or record.is_dot() or record.is_dotdot() or record.is_dir():
+                continue
+            name = record.file_identifier().decode("ascii", "replace").split(";", 1)[0].upper()
+            if re.match(r"^(?:SLUS|SLES|SCUS|SCES)_", name):
+                root_executables.append(name)
+
+        executable = boot_executable
+        if executable is None and len(root_executables) == 1:
+            # Keep simple fixture ISOs identifiable even without BOOT2 metadata.
+            executable = root_executables[0]
+
+        profile = REGION_PROFILES.get(executable or "")
+        if profile is None:
+            found = ", ".join(sorted(root_executables)) or "no recognized executable"
             raise BuildError(
-                "Unsupported GTA San Andreas disc version. This project requires the "
-                f"US NTSC-U v1.03 executable SLUS_209.46; found {found}. "
-                "--allow-modded skips only the checksum check; it cannot adapt another region."
+                "Unsupported GTA San Andreas release. Recognized profiles are "
+                "US NTSC-U v1.03 (SLUS_209.46) and PAL v1.00 (SLES_529.27); "
+                f"SYSTEM.CNF points to {boot_executable or found}."
+            )
+
+        try:
+            iso.get_record(iso_path=f"/{profile.executable};1")
+        except Exception as exc:
+            raise BuildError(
+                f"SYSTEM.CNF points to {profile.executable}, but that executable is missing from the ISO."
             ) from exc
+
+        version_match = re.search(r"(?im)^\s*VER\s*=\s*([^\s]+)", system_text)
+        mode_match = re.search(r"(?im)^\s*VMODE\s*=\s*([^\s]+)", system_text)
+        version = version_match.group(1).strip() if version_match else None
+        mode = mode_match.group(1).strip().upper() if mode_match else None
+
+        if profile.mode == "NTSC" and version and version != profile.version:
+            raise BuildError(
+                f"{profile.executable} detected with VER={version}; this profile requires v{profile.version}."
+            )
+
+        # PAL releases reuse this product ID; accept only the v1.00 PAL profile.
+        if profile.mode == "PAL" and (version != profile.version or mode != profile.mode):
+            raise BuildError(
+                "PAL executable SLES_529.27 detected, but the disc does not identify itself "
+                "as PAL v1.00 (VER=1.00, VMODE=PAL). Other PAL revisions are not supported."
+            )
+        if profile.executable_sha1:
+            executable_buffer = io.BytesIO()
+            iso.get_file_from_iso_fp(
+                executable_buffer,
+                iso_path=f"/{profile.executable};1",
+            )
+            executable_sha1 = hashlib.sha1(executable_buffer.getvalue()).hexdigest()
+            if executable_sha1 != profile.executable_sha1:
+                raise BuildError(
+                    f"{profile.label} has an unexpected {profile.executable} executable hash; "
+                    "this revision is not supported by the current profile."
+                )
+        return profile
+    except BuildError:
+        raise
+    except Exception as exc:
+        raise BuildError(f"Could not inspect the ISO region: {exc}") from exc
     finally:
         iso.close()
 
+
+def check_iso(src: Path, allow_modded: bool) -> RegionProfile:
+    log.info("      ISO: %s", src)
+
+    if not src.is_file():
+        raise BuildError(
+            f"ISO not found: {src}\n"
+            "Choose a supported US NTSC-U v1.03 or PAL v1.00 San Andreas ISO, "
+            "or pass its path with --iso."
+        )
+
+    profile = detect_iso_region(src)
+    log.info("      Detected game: %s (%s)", profile.label, profile.executable)
+    if profile.experimental:
+        log.warning(
+            "      PAL patch compatibility is experimental and has not been verified in-game."
+        )
+
     if allow_modded:
         log.info("      Checksum verification skipped (--allow-modded).")
-        return
+        return profile
 
+    if profile.reference_checksums is None:
+        raise BuildError(
+            f"Detected {profile.label}, but no reference checksum is configured. "
+            "After confirming this is your clean PAL v1.00 dump, pass --allow-modded to continue."
+        )
+
+    expected_md5, expected_sha1 = profile.reference_checksums
     log.info("      Calculating MD5/SHA1, this can take a while ...")
     digest = checksum(src)
 
-    if digest["md5"] != EXPECTED_MD5 or digest["sha1"] != EXPECTED_SHA1:
+    if digest["md5"] != expected_md5 or digest["sha1"] != expected_sha1:
         raise BuildError(
             "ISO checksum mismatch.\n"
-            f"  expected md5  {EXPECTED_MD5}\n"
+            f"  expected md5  {expected_md5}\n"
             f"  actual   md5  {digest['md5']}\n"
-            f"  expected sha1 {EXPECTED_SHA1}\n"
+            f"  expected sha1 {expected_sha1}\n"
             f"  actual   sha1 {digest['sha1']}\n"
-            "Use the NTSC-U v1.03 dump, or pass --allow-modded to build anyway."
+            "For a modified copy of a recognized release, pass --allow-modded."
         )
+    return profile
 
 
 def extract_iso(src: Path, dst: Path) -> None:
@@ -556,7 +666,7 @@ def check_environment(settings: Settings) -> None:
         packages.update(OPTIONAL_PACKAGES)
     require_packages(packages)
 
-    check_iso(settings.iso, settings.allow_modded)
+    settings.region = check_iso(settings.iso, settings.allow_modded)
     warn_free_space(settings, settings.iso.stat().st_size)
 
 
@@ -601,13 +711,24 @@ def verify_output(settings: Settings) -> None:
     if not output.is_file() or output.stat().st_size == 0:
         raise BuildError(f"Output ISO is missing or empty: {output}")
 
+    profile = detect_iso_region(output)
+    if settings.region is not None and profile.executable != settings.region.executable:
+        raise BuildError(
+            f"The output region changed unexpectedly: expected {settings.region.executable}, "
+            f"found {profile.executable}."
+        )
+
+    required_entries = (
+        *REQUIRED_ISO_ENTRIES,
+        f"/{profile.executable};1",
+    )
     files = 0
     directories = 0
     iso = pycdlib.PyCdlib()
     try:
         iso.open(str(output))
 
-        for required in REQUIRED_ISO_ENTRIES:
+        for required in required_entries:
             try:
                 iso.get_record(iso_path=required)
             except Exception as exc:  # pycdlib raises different errors per version
@@ -649,7 +770,7 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "preflight",
         "Checking configuration and input ISO",
-        "Validate the config, Python packages, free space and the ISO checksum.",
+        "Validate the config, Python packages, free space, ISO region and checksum policy.",
         check_environment,
     ),
     Stage(
@@ -767,12 +888,12 @@ def add_build_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
     """Add the options shared by ``build.py`` and ``buildiso.py``."""
     parser.add_argument("--config", type=Path, default=Path(DEFAULT_CONFIG),
                         help="Path to the build configuration")
-    parser.add_argument("--iso", type=Path, help="Original GTA San Andreas (NTSC-U v1.03) ISO")
+    parser.add_argument("--iso", type=Path, help="Original supported GTA San Andreas (PS2) ISO")
     parser.add_argument("--output", type=Path, help="Path of the ISO to write")
     parser.add_argument("--project-dir", type=Path, help="Folder containing the mod files")
     parser.add_argument("--build-dir", type=Path, help="Working folder for the extracted ISO")
     parser.add_argument("--allow-modded", action="store_true",
-                        help="Skip the ISO checksum verification")
+                        help="Skip ISO checksum verification (required for experimental PAL v1.00)")
 
     extraction = parser.add_mutually_exclusive_group()
     extraction.add_argument("--reuse-build", action="store_true",

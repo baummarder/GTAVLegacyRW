@@ -2,17 +2,17 @@
 
 ## Current status
 
-PAL is **not supported yet**. The build targets the US NTSC-U v1.03 release (`SLUS_209.46`). The PAL disc available for development identifies itself as PAL v1.00 and boots `SLES_529.27`.
+The builder recognizes and packages PAL v1.00 (`SLES_529.27`) as an **experimental profile**. In-game compatibility is not verified. US NTSC-U v1.03 (`SLUS_209.46`) remains the only profile with a reference image checksum.
 
-Passing `--allow-modded` only skips the checksum comparison. It does not translate executable patches, overlays, plugins, or regional game data. The build must keep rejecting PAL input until a PAL-specific patch set has been ported and tested.
+Passing `--allow-modded` skips checksum comparison so a clean PAL dump without a configured reference hash can be used. It does not translate executable patches, overlays, plugins, or regional game data. Treat PAL output as experimental until it passes the tests below.
 
 ## Porting work
 
 1. **Record a clean baseline** – preserve the original PAL image and record its disc ID, `SYSTEM.CNF`, executable size, and hashes. Confirm that the unmodified image boots on PCSX2 and the target PS2 setup.
 2. **Inventory executable-dependent changes** – identify every address, hook, and binary assumption in `SLUS_209.46`, `src/overlays/`, and `src/plugins/`. Compare the PAL executable and its game data before changing any patch.
 3. **Port the patches** – make PAL-specific executable patches and adjust any regional data or asset references that differ. Keep the NTSC-U files and behavior intact.
-4. **Add explicit region profiles to the builder** – select a profile from the verified disc ID. Each profile must define its accepted executable, checksum policy, patch assets, and output verification entries. Never use `--allow-modded` as a region selector.
-5. **Validate both profiles** – run automated checks for NTSC and PAL packaging, then boot each image in PCSX2. For PAL, test the output on the physical PS2, including startup, loading, gameplay, audio, saves, and the modified features. Record the console model, boot method, and results.
+4. **Complete profile-specific patching** – region detection and output verification are in place for NTSC-U v1.03 and PAL v1.00. Add PAL-specific patches or prove the shared patches work at PAL addresses. Never use `--allow-modded` as a region selector.
+5. **Validate both profiles** – check NTSC and PAL packaging, then boot each image in PCSX2. For PAL, test the output on the physical PS2, including startup, loading, gameplay, audio, saves, and modified features. Record the console model, boot method, and results.
 
 ## Console test notes
 
