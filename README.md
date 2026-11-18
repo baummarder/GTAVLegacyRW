@@ -8,7 +8,7 @@ Build on **Windows, Linux or macOS** with Python. UltraISO and the original Wind
 
 The output is intended for emulators such as PCSX2 and PS2 hardware using OPL/FreeMcBoot. Compatibility and gameplay are not guaranteed.
 
-> **CLOSED ALPHA** · An early, limited test phase—not a finished release. Features and assets may be incomplete, and crashes are possible.
+> **🧪 CLOSED ALPHA** · An early, limited test phase—not a finished release. Features and assets may be incomplete, and crashes are possible.
 >
 > **This repository continues the legacy of [GTAVLegacy by Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy).** See [Project lineage](#project-lineage).
 
@@ -19,7 +19,7 @@ The output is intended for emulators such as PCSX2 and PS2 hardware using OPL/Fr
 ---
 
 <details>
-<summary>Contents</summary>
+<summary>📚 Contents</summary>
 
 - [Project lineage](#project-lineage)
 - [What this project does](#what-this-project-does)
@@ -43,7 +43,7 @@ The output is intended for emulators such as PCSX2 and PS2 hardware using OPL/Fr
 
 ---
 
-## Project lineage
+## 🧬 Project lineage
 
 This project did not start from scratch. It is a **continuation (legacy fork)** of the original GTA V Legacy project:
 
@@ -62,7 +62,7 @@ If you build on this project, please keep the lineage visible and credit the ori
 
 ---
 
-## What this project does
+## 🎮 What this project does
 
 `build.py` is the central build tool. One command runs every stage from `buildiso.py`:
 
@@ -76,6 +76,15 @@ If you build on this project, please keep the lineage visible and credit the ori
 
 The repo also ships PS2 binary patches (`src/overlays/*.NM`, `src/plugins/*.dep`) that extend the game at console level (CLEO support and custom opcodes, among other things).
 
+### Compatibility at a glance
+
+| Area | Status | Notes |
+|---|---|---|
+| Build pipeline | ✅ Implemented | Creates an ISO and checks its required files. |
+| NTSC-U v1.03 input | ✅ Accepted | The current build and patches target this release. |
+| PAL releases | 🟡 Not supported | A separate patch port and real-console testing are still needed; see the [PAL roadmap](docs/PAL_SUPPORT.md). |
+| In-game compatibility | ⚪ Not verified | A successful ISO build does not confirm that gameplay works on PCSX2 or PS2 hardware. |
+
 Asset categories included:
 
 | Category | Examples |
@@ -88,9 +97,13 @@ Asset categories included:
 | HUD / UI | `VLHUD.TXD`, `VHUD.TXD`, `VPHONE*.TXD`, radar tiles |
 | Audio | GTA V radio stations as PS2 streams (`src/audio/STREAMS`) |
 
+### 📸 Screenshots
+
+There are no verified gameplay screenshots of the current build in the repository yet. Genuine captures will be added after the build has been checked in-game; no mockups are used as screenshots.
+
 ---
 
-## Requirements
+## 🧰 Requirements
 
 | Needed | Details |
 |---|---|
@@ -100,7 +113,7 @@ Asset categories included:
 | **Free disk space** | Several GB – the ISO is extracted, the new ISO is written next to it, and audio archives are unpacked temporarily. |
 | **Operating system** | Windows, Linux or macOS. No external tools required. |
 
-### ISO checksums
+### 🔐 ISO checksums
 
 By default the build only accepts this ISO:
 
@@ -115,7 +128,7 @@ See the [PAL support roadmap](docs/PAL_SUPPORT.md) for the porting and PS2 test 
 
 ---
 
-## Quick start
+## 🚀 Quick start
 
 ### 1. Install Python dependencies
 
@@ -166,7 +179,7 @@ The finished image uses the output path from `config.ini` unless you pass `--out
 
 ---
 
-## Command line
+## 🖥️ Command line
 
 ### Commands
 
@@ -234,7 +247,7 @@ The tool exits with `0` on success and `1` on a build error (with a readable mes
 
 ---
 
-## config.ini
+## ⚙️ config.ini
 
 ```ini
 [DEFAULT]
@@ -259,7 +272,7 @@ The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is 
 
 ---
 
-## How the build works
+## 🔧 How the build works
 
 `build.py` runs the stages from `buildiso.py` in this order (use `--only`/`--skip` to change that):
 
@@ -315,7 +328,7 @@ Notes on the formats used by the Python implementation:
 
 ---
 
-## Project layout
+## 🗂️ Project layout
 
 ```
 GTAVLegacy/
@@ -356,7 +369,7 @@ Important: `build/` and the temporary `IMGconsole_32-bit/gta3*` folders are **ar
 
 ---
 
-## Language and naming
+## 📝 Language and naming
 
 The repository is English-first so that it can be worked on internationally:
 
@@ -372,7 +385,7 @@ Non-English legacy folders have been translated: `Instalador de Musicas` → `mu
 
 ---
 
-## Adding assets
+## 🎨 Adding assets
 
 ### Vehicles, weapons, peds, map objects
 
@@ -399,7 +412,7 @@ Put TXDs (e.g. `VLHUD.TXD`) into `src/models/` or `src/models/txd/`. The PNG/DDS
 
 ---
 
-## Audio / radio streams
+## 🎧 Audio / radio streams
 
 The GTA V radio stations are stored as a multi-part 7z archive:
 
@@ -423,7 +436,7 @@ If the folder is missing entirely, the build warns and continues without custom 
 
 ---
 
-## Known pitfalls
+## ⚠️ Known pitfalls
 
 | Problem | Cause / fix |
 |---|---|
@@ -457,7 +470,7 @@ Remaining technical debt:
 
 ---
 
-## Continuing the project
+## 🧭 Continuing the project
 
 Roadmap for the next steps:
 
@@ -472,7 +485,7 @@ When developing further, remember: **`src/` is the source of truth.** Anything t
 
 ---
 
-## Publishing this fork
+## 📤 Publishing this fork
 
 `origin` points to the continuation repository, `upstream` to the original project:
 
@@ -492,7 +505,7 @@ Do **not** publish ISO files or any game assets you are not allowed to redistrib
 
 ---
 
-## Development notes
+## 🧪 Development notes
 
 ### Tests
 
@@ -534,7 +547,7 @@ python build.py stages            # list the stage keys
 
 ---
 
-## Legal
+## ⚖️ Legal
 
 - The code in this repo is licensed under the **MIT License** (see `LICENSE`, © 2023 Daniel Santos, © 2026 Baummarder).
 - **GTA San Andreas** and **GTA V**, along with all assets, are property of **Rockstar Games / Take-Two Interactive**.
@@ -543,7 +556,7 @@ python build.py stages            # list the stage keys
 
 ---
 
-## Credits
+## 🙌 Credits
 
 - **Daniel Santos** ([@DanielSant0s](https://github.com/DanielSant0s)) – original GTAVLegacy project, build script, asset conversion, PS2 overlays
 - **@baummarder** – maintainer of this continuation

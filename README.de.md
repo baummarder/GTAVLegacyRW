@@ -8,7 +8,7 @@ Der Build läuft mit Python unter **Windows, Linux und macOS**. UltraISO und die
 
 Das fertige Image ist für Emulatoren wie PCSX2 und PS2-Hardware mit OPL/FreeMcBoot vorgesehen. Kompatibilität und Spielbarkeit sind nicht garantiert.
 
-> **CLOSED ALPHA** · Eine frühe, begrenzte Testphase – noch keine fertige Veröffentlichung. Funktionen und Assets können fehlen; Abstürze sind möglich.
+> **🧪 CLOSED ALPHA** · Eine frühe, begrenzte Testphase – noch keine fertige Veröffentlichung. Funktionen und Assets können fehlen; Abstürze sind möglich.
 >
 > **Dieses Repository führt die Legacy von [GTAVLegacy von Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy) weiter.** Siehe [Projekt-Historie](#projekt-historie).
 
@@ -19,7 +19,7 @@ Das fertige Image ist für Emulatoren wie PCSX2 und PS2-Hardware mit OPL/FreeMcB
 ---
 
 <details>
-<summary>Inhalt</summary>
+<summary>📚 Inhalt</summary>
 
 - [Projekt-Historie](#projekt-historie)
 - [Was das Projekt macht](#was-das-projekt-macht)
@@ -43,7 +43,7 @@ Das fertige Image ist für Emulatoren wie PCSX2 und PS2-Hardware mit OPL/FreeMcB
 
 ---
 
-## Projekt-Historie
+## 🧬 Projekt-Historie
 
 Dieses Projekt ist keine Neuentwicklung, sondern die **Weiterführung (Legacy-Fork)** des ursprünglichen GTA-V-Legacy-Projekts:
 
@@ -62,7 +62,7 @@ Wenn du auf diesem Projekt aufbaust, halte die Historie sichtbar und nenne den O
 
 ---
 
-## Was das Projekt macht
+## 🎮 Was das Projekt macht
 
 `build.py` ist das zentrale Build-Tool. Ein Befehl führt alle Stages aus `buildiso.py` aus:
 
@@ -76,6 +76,15 @@ Wenn du auf diesem Projekt aufbaust, halte die Historie sichtbar und nenne den O
 
 Zusätzlich liegen im Repo PS2-Binärpatches (`src/overlays/*.NM`, `src/plugins/*.dep`), die das Spiel auf Konsolen-Ebene erweitern (u. a. CLEO-Support und eigene Opcodes).
 
+### Kompatibilität auf einen Blick
+
+| Bereich | Status | Hinweis |
+|---|---|---|
+| Build-Pipeline | ✅ Implementiert | Erstellt ein ISO und prüft die erforderlichen Dateien. |
+| NTSC-U-v1.03-Eingabe | ✅ Akzeptiert | Build und Patches zielen auf diese Spielversion. |
+| PAL-Versionen | 🟡 Nicht unterstützt | Ein eigener Patch-Port und Tests auf echter Hardware sind nötig; siehe [PAL-Fahrplan](docs/PAL_SUPPORT.md). |
+| Kompatibilität im Spiel | ⚪ Nicht verifiziert | Ein erfolgreich erstelltes ISO bestätigt noch keine Spielbarkeit auf PCSX2 oder PS2-Hardware. |
+
 Enthaltene Asset-Kategorien:
 
 | Kategorie | Beispiele |
@@ -88,9 +97,13 @@ Enthaltene Asset-Kategorien:
 | HUD / UI | `VLHUD.TXD`, `VHUD.TXD`, `VPHONE*.TXD`, Radar-Kacheln |
 | Audio | GTA-V-Radiosender als PS2-Streams (`src/audio/STREAMS`) |
 
+### 📸 Screenshots
+
+Im Repository gibt es noch keine geprüften Gameplay-Screenshots des aktuellen Builds. Echte Aufnahmen kommen hinzu, sobald der Build im Spiel getestet wurde; Mockups werden nicht als Screenshots verwendet.
+
 ---
 
-## Voraussetzungen
+## 🧰 Voraussetzungen
 
 | Benötigt | Details |
 |---|---|
@@ -100,7 +113,7 @@ Enthaltene Asset-Kategorien:
 | **Freier Speicher** | Mehrere GB – das ISO wird entpackt, das neue ISO daneben geschrieben und Audio-Archive temporär entpackt. |
 | **Betriebssystem** | Windows, Linux oder macOS. Keine externen Tools nötig. |
 
-### ISO-Prüfsummen
+### 🔐 ISO-Prüfsummen
 
 Der Build akzeptiert standardmäßig nur dieses ISO:
 
@@ -115,7 +128,7 @@ Der [PAL-Fahrplan](docs/PAL_SUPPORT.md) beschreibt die nötigen Anpassungen und 
 
 ---
 
-## Schnellstart
+## 🚀 Schnellstart
 
 ### 1. Python-Abhängigkeiten installieren
 
@@ -166,7 +179,7 @@ Ohne `--output` wird der in `config.ini` eingetragene Ausgabepfad verwendet. Tes
 
 ---
 
-## Kommandozeile
+## 🖥️ Kommandozeile
 
 ### Befehle
 
@@ -234,7 +247,7 @@ Das Tool endet mit `0` bei Erfolg und `1` bei einem Build-Fehler (mit lesbarer M
 
 ---
 
-## config.ini
+## ⚙️ config.ini
 
 ```ini
 [DEFAULT]
@@ -259,7 +272,7 @@ Das Skript schreibt `config.ini` nicht mehr zurück; der alte Abschnitt `[SAVED_
 
 ---
 
-## Wie der Build abläuft
+## 🔧 Wie der Build abläuft
 
 `build.py` führt die Stages aus `buildiso.py` in dieser Reihenfolge aus (`--only`/`--skip` ändern das):
 
@@ -315,7 +328,7 @@ Hinweise zu den Formaten der Python-Implementierung:
 
 ---
 
-## Projektstruktur
+## 🗂️ Projektstruktur
 
 ```
 GTAVLegacy/
@@ -356,7 +369,7 @@ Wichtig: `build/` und die temporären `IMGconsole_32-bit/gta3*`-Ordner sind **Ar
 
 ---
 
-## Sprache und Benennung
+## 📝 Sprache und Benennung
 
 Das Repository ist englisch-first, damit international daran gearbeitet werden kann:
 
@@ -372,7 +385,7 @@ Nicht-englische Legacy-Ordner wurden übersetzt: `Instalador de Musicas` → `mu
 
 ---
 
-## Assets hinzufügen
+## 🎨 Assets hinzufügen
 
 ### Fahrzeuge, Waffen, Peds, Map-Objekte
 
@@ -399,7 +412,7 @@ TXDs (z. B. `VLHUD.TXD`) nach `src/models/` bzw. `src/models/txd/` legen. Die PN
 
 ---
 
-## Audio / Radio-Streams
+## 🎧 Audio / Radio-Streams
 
 Die GTA-V-Sender liegen als mehrteiliges 7z-Archiv vor:
 
@@ -423,7 +436,7 @@ Fehlt der Ordner komplett, warnt der Build und läuft ohne eigenes Audio weiter.
 
 ---
 
-## Bekannte Stolperfallen
+## ⚠️ Bekannte Stolperfallen
 
 | Problem | Ursache / Lösung |
 |---|---|
@@ -457,7 +470,7 @@ Verbleibende technische Schulden:
 
 ---
 
-## Projekt weiterführen
+## 🧭 Projekt weiterführen
 
 Roadmap für die nächsten Schritte:
 
@@ -472,7 +485,7 @@ Beim Weiterentwickeln gilt: **`src/` ist die Quelle der Wahrheit.** Alles, was n
 
 ---
 
-## Fork veröffentlichen
+## 📤 Fork veröffentlichen
 
 `origin` zeigt auf die Weiterführung, `upstream` auf das Originalprojekt:
 
@@ -492,7 +505,7 @@ Veröffentliche **keine** ISO-Dateien oder Spiel-Assets, die du nicht weitergebe
 
 ---
 
-## Hinweise für Entwickler
+## 🧪 Hinweise für Entwickler
 
 ### Tests
 
@@ -534,7 +547,7 @@ python build.py stages            # Stage-Keys auflisten
 
 ---
 
-## Rechtliches
+## ⚖️ Rechtliches
 
 - Der Code dieses Repos steht unter der **MIT License** (siehe `LICENSE`, © 2023 Daniel Santos, © 2026 Baummarder).
 - **GTA San Andreas** und **GTA V** sowie alle Assets sind Eigentum von **Rockstar Games / Take-Two Interactive**.
@@ -543,7 +556,7 @@ python build.py stages            # Stage-Keys auflisten
 
 ---
 
-## Credits
+## 🙌 Credits
 
 - **Daniel Santos** ([@DanielSant0s](https://github.com/DanielSant0s)) – ursprüngliches GTAVLegacy-Projekt, Build-Skript, Asset-Konvertierung, PS2-Overlays
 - **@baummarder** – Maintainer dieser Weiterführung
