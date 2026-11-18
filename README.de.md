@@ -281,7 +281,7 @@ Das Skript schreibt `config.ini` nicht mehr zurück; der alte Abschnitt `[SAVED_
 1. **Preflight** – Projektordner, Python-Pakete, freier Speicher und Eingabe-ISO (Existenz + optional MD5/SHA1). Das passiert *bevor* etwas gelöscht wird, damit ein Tippfehler keine bestehende Extraktion vernichtet.
 2. **Build-Ordner vorbereiten** – `build/` wird entfernt (außer bei Wiederverwendung) und neu angelegt.
 3. **ISO entpacken** – rekursiv nach `build/` via `pycdlib`.
-4. **Mod-Dateien kopieren** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/` sowie die Inhalte von `overlays/`. Nicht ins ISO gehörende Altlasten (`models/gta3_1.img`, `movies/`) werden entfernt.
+4. **Mod-Dateien kopieren** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/` sowie die Inhalte von `overlays/`. Die GTA-V-Introclips ersetzen `MOVIES/VCNTSC.PSS` und `MOVIES/OPEN1.PSS` aus San Andreas; nur das geteilte Archiv `models/gta3_1.img` wird entfernt.
 5. **Audio-Streams entpacken** – alle `STREAMS.7z.*`-Teile in `src/audio/STREAMS/` werden zu `result.7z` zusammengefügt, entpackt und das Archiv gelöscht.
 6. **IMG-Archive neu bauen** – jede Datei unter `src/assets/` wird von `imgtool.py` in `gta3.img`/`gta_int.img` gemischt: vorhandene Einträge werden ersetzt, neue angehängt. Die Archive werden Sektor für Sektor neu geschrieben und müssen nie komplett in den Speicher.
 7. **ISO schreiben** – die enthaltenen `mkps2iso`-Werkzeuge erzeugen ein PS2-DVD-Image mit UDF-Dateisystem, ISO9660-Brücke, Boot-Kennungen und zur Region passendem Startlogo. Der Builder prüft die Type-L- und Type-M-Pfadtabellen an den Sektoren 257 und 259.
@@ -356,7 +356,7 @@ GTAVLegacy/
 │  │  └─ build.txt           # Legacy-IMG-Console-Skript, ungenutzt
 │  ├─ audio/                 # CONFIG/, SFX/ und STREAMS/ (7z-Teile)
 │  ├─ data/                  # GTA-SA-Datentabellen (handling, ide, ipl ...)
-│  ├─ intro/                 # RGM-Introvideos
+│  ├─ intro/                 # GTA-V-Startlogo und Ladeclips (RGM)
 │  ├─ models/                # IMGs, TXDs, Effekte, HUD
 │  ├─ overlays/              # PS2-Overlays: INIT.NM, FILELOAD.NM, relocator.nm
 │  ├─ plugins/               # CLEO/Opcode-Patches (.dep) + plugins.ini

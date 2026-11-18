@@ -417,31 +417,6 @@ def extract_iso(src: Path, dst: Path) -> None:
         iso.close()
 
 
-def restore_required_movies(src: Path, build: Path) -> None:
-    """Keep the original NTSC intro movies available in reused build folders."""
-    movie_names = ("OPEN1.PSS", "VCNTSC.PSS")
-    missing = [name for name in movie_names if not (build / "movies" / name).is_file()]
-    if not missing:
-        return
-
-    pycdlib = require_module("pycdlib", "pycdlib")
-    iso = pycdlib.PyCdlib()
-    try:
-        iso.open(str(src))
-        for name in missing:
-            target = build / "movies" / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                with target.open("wb") as outfile:
-                    iso.get_file_from_iso_fp(outfile, iso_path=f"/MOVIES/{name};1")
-            except Exception as exc:
-                raise BuildError(
-                    f"Could not restore required startup movie MOVIES/{name} from the input ISO."
-                ) from exc
-    finally:
-        iso.close()
-
-
 def install_project_files(project: Path, build: Path) -> None:
     for name in ("intro", "text", "data"):
         copy_tree(project / name, build / name)
@@ -458,8 +433,21 @@ def install_project_files(project: Path, build: Path) -> None:
 
     copy_tree_contents(project / "overlays", build)
 
-    # This split image is an extraction artifact; the original movies folder
-    # contains the intro videos GTA SA needs during startup.
+    # GTA SA's boot flow requests these movie paths. Replace its stock logo and
+    # long opening movie with the GTA V Legacy clips supplied in src/intro.
+    boot_movies = {
+        "VCNTSC.PSS": "VLOGOS.RGM",
+        "OPEN1.PSS": "VLOAD.RGM",
+    }
+    movies = build / "movies"
+    movies.mkdir(parents=True, exist_ok=True)
+    for movie_name, intro_name in boot_movies.items():
+        source = project / "intro" / intro_name
+        if not source.is_file():
+            raise BuildError(f"Required GTA V Legacy boot clip is missing: {source}")
+        shutil.copyfile(source, movies / movie_name)
+
+    # This split image is an extraction artifact and must not ship.
     for stale in (build / "models" / "gta3_1.img",):
         if stale.is_dir():
             log.debug("Removing stale folder: %s", stale)
@@ -762,7 +750,6 @@ def prepare_build_folder(settings: Settings) -> None:
 def extract_stage(settings: Settings) -> None:
     if settings.reuse_build and (settings.build / "models" / "gta3.img").is_file():
         log.info("      Existing extraction found, skipping.")
-        restore_required_movies(settings.iso, settings.build)
         return
     extract_iso(settings.iso, settings.build)
 

@@ -281,7 +281,7 @@ The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is 
 1. **Preflight** – project folder, Python packages, free space and the input ISO (existence plus optional MD5/SHA1). This happens *before* anything is deleted, so a typo cannot wipe an existing extraction.
 2. **Prepare the build folder** – `build/` is removed (unless reusing) and recreated.
 3. **Extract the ISO** – recursively into `build/` via `pycdlib`.
-4. **Copy mod files** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/`, plus the contents of `overlays/`. Stale files that must not ship (`models/gta3_1.img`, `movies/`) are removed.
+4. **Copy mod files** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/`, plus the contents of `overlays/`. The GTA V intro clips replace San Andreas's `MOVIES/VCNTSC.PSS` and `MOVIES/OPEN1.PSS`; only the split archive `models/gta3_1.img` is removed.
 5. **Unpack audio streams** – all `STREAMS.7z.*` parts in `src/audio/STREAMS/` are joined into `result.7z`, extracted, and the archive is deleted.
 6. **Rebuild the IMG archives** – every file under `src/assets/` is merged into `gta3.img` / `gta_int.img` by `imgtool.py`: entries that already exist are replaced, new ones are appended. The archives are rewritten sector by sector, so they never have to fit into memory.
 7. **Write the ISO** – the bundled `mkps2iso` tools create a PS2 DVD image with its UDF filesystem, ISO9660 bridge, boot identifiers and region-matched boot logo. The Type-L and Type-M path tables are checked at sectors 257 and 259.
@@ -356,7 +356,7 @@ GTAVLegacy/
 │  │  └─ build.txt           # legacy IMG Console script, no longer used
 │  ├─ audio/                 # CONFIG/, SFX/ and STREAMS/ (7z parts)
 │  ├─ data/                  # GTA SA data tables (handling, ide, ipl ...)
-│  ├─ intro/                 # RGM intro videos
+│  ├─ intro/                 # GTA V boot/logo and loading clips (RGM)
 │  ├─ models/                # IMGs, TXDs, effects, HUD
 │  ├─ overlays/              # PS2 overlays: INIT.NM, FILELOAD.NM, relocator.nm
 │  ├─ plugins/               # CLEO/opcode patches (.dep) + plugins.ini
