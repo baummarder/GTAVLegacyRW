@@ -71,7 +71,7 @@ If you build on this project, please keep the lineage visible and credit the ori
 3. copies the project's own files from `src/` over the extracted ISO,
 4. unpacks the split `STREAMS.7z.*` archives (GTA V radio stations as PS2 audio streams),
 5. merges the converted assets into `gta3.img` and `gta_int.img` with a built-in IMG writer,
-6. builds the final ISO with `pycdlib`,
+6. builds the final ISO with `pycdlib` and places its path tables at the PS2 DVD sectors,
 7. reopens the finished ISO and verifies the important entries.
 
 The repo also ships PS2 binary patches (`src/overlays/*.NM`, `src/plugins/*.dep`) that extend the game at console level (CLEO support and custom opcodes, among other things).
@@ -283,7 +283,7 @@ The script no longer rewrites `config.ini`; the old `[SAVED_CONFIG]` section is 
 4. **Copy mod files** – `intro/`, `text/`, `data/`, `models/`, `audio/CONFIG`, `audio/SFX`, `anim/`, `plugins/`, plus the contents of `overlays/`. Stale files that must not ship (`models/gta3_1.img`, `movies/`) are removed.
 5. **Unpack audio streams** – all `STREAMS.7z.*` parts in `src/audio/STREAMS/` are joined into `result.7z`, extracted, and the archive is deleted.
 6. **Rebuild the IMG archives** – every file under `src/assets/` is merged into `gta3.img` / `gta_int.img` by `imgtool.py`: entries that already exist are replaced, new ones are appended. The archives are rewritten sector by sector, so they never have to fit into memory.
-7. **Write the ISO** – `pycdlib` creates a fresh ISO9660 level 2 image from `build/`, retaining the longer names used by added scripts and plugins.
+7. **Write the ISO** – `pycdlib` creates a fresh ISO9660 level 2 image from `build/`, retaining longer asset names. The writer places the Type-L and Type-M path tables at PS2 DVD sectors 257 and 259 and reserves that space in an internal padding file.
 8. **Verify the output** – the ISO is reopened and must contain `SYSTEM.CNF`, the detected region's executable, `MODELS/GTA3.IMG` and `MODELS/GTA_INT.IMG`; the file and folder counts are printed.
 
 Expected output (roughly):
@@ -324,7 +324,7 @@ Done. 8 stage(s) in 5 min 14 s.
 Notes on the formats used by the Python implementation:
 
 - IMG archives are **VER2** (GTA San Andreas). Entries are limited to 65535 sectors (~128 MiB) and 23 characters per name, exactly like the original tools. Violations abort the build with a clear message.
-- The ISO is written as plain **ISO9660 Level 2** to retain longer script and plugin filenames. Names are limited to 31 characters and `A-Z`, `0-9`, `_` and one dot. Raw PNG/PSD editor artwork and IDE metadata are left out of the game image.
+- The ISO is written as **ISO9660 Level 2** to retain longer script and plugin filenames. For PS2 DVD boot, its Type-L and Type-M path tables are placed at sectors 257 and 259, as expected by the PS2 DVD filesystem; `000PS2PAD.BIN` reserves those sectors. Names are limited to 31 characters and `A-Z`, `0-9`, `_` and one dot. Raw PNG/PSD editor artwork and IDE metadata are left out of the game image. [PS2SDK CDVD source](https://github.com/ps2dev/ps2sdk/blob/master/iop/cdvd/cdvdman/src/cdvdman.c)
 - The ISO is rebuilt from the file contents, not by patching the original image byte by byte. The directory order may therefore differ from the retail disc.
 
 ---

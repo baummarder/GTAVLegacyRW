@@ -4,6 +4,8 @@
 
 The builder recognizes and packages PAL v1.00 (`SLES_529.27`) as an **experimental profile**. In-game compatibility is not verified. US NTSC-U v1.03 (`SLUS_209.46`) remains the only profile with a reference image checksum.
 
+The former black-screen build placed its ISO9660 path tables at sectors 19 and 21. The PS2 DVD CDVD path reads the Type-L table from sector 257; the writer now places the tables at sectors 257 and 259 and reserves them with `000PS2PAD.BIN` ([PS2SDK source](https://github.com/ps2dev/ps2sdk/blob/master/iop/cdvd/cdvdman/src/cdvdman.c)). A newly packaged PAL image is available for physical-console validation.
+
 Passing `--allow-modded` skips checksum comparison so a clean PAL dump without a configured reference hash can be used. It does not translate executable patches, overlays, plugins, or regional game data. Treat PAL output as experimental until it passes the tests below.
 
 ## Porting work

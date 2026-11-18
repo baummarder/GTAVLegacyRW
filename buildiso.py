@@ -32,6 +32,7 @@ import logging
 import os
 import re
 import shutil
+import struct
 import sys
 import time
 from dataclasses import dataclass
@@ -78,6 +79,11 @@ OPTIONAL_PACKAGES: dict[str, str] = {"py7zr": "py7zr"}
 
 #: Rough space estimate: input ISO + extracted build folder + output ISO.
 DISK_SPACE_FACTOR = 2.5
+ISO_LOGICAL_BLOCK_SIZE = 2048
+PS2_DVD_TYPE_L_PATH_TABLE_LBA = 257
+PS2_DVD_TYPE_M_PATH_TABLE_LBA = 259
+PS2_DVD_PAD_PATH = "/000PS2PAD.BIN;1"
+PS2_DVD_PAD_SIZE = 256 * ISO_LOGICAL_BLOCK_SIZE
 
 #: Entries shared by every finished build.
 REQUIRED_ISO_ENTRIES = (
@@ -579,6 +585,62 @@ def iso_path(relative: Path, *, is_file: bool) -> str:
     return f"{path};1" if is_file else path
 
 
+def patch_ps2_dvd_path_tables(output: Path, iso) -> None:
+    """Place ISO9660 path tables at the fixed sectors expected for PS2 DVDs."""
+    pvd = iso.pvd
+    if pvd.logical_block_size() != ISO_LOGICAL_BLOCK_SIZE:
+        raise BuildError("PS2 DVD images must use 2048-byte ISO9660 sectors.")
+
+    table_size = pvd.path_table_size()
+    if table_size > ISO_LOGICAL_BLOCK_SIZE:
+        raise BuildError(
+            "The ISO path table is larger than one PS2 DVD path-table sector; "
+            "this image layout is not supported."
+        )
+
+    pad_record = iso.get_record(iso_path=PS2_DVD_PAD_PATH)
+    pad_start = pad_record.extent_location()
+    pad_end = pad_start + (pad_record.data_length + ISO_LOGICAL_BLOCK_SIZE - 1) // ISO_LOGICAL_BLOCK_SIZE
+    if not (
+        pad_start <= PS2_DVD_TYPE_L_PATH_TABLE_LBA
+        and pad_start <= PS2_DVD_TYPE_M_PATH_TABLE_LBA
+        and pad_end > PS2_DVD_TYPE_M_PATH_TABLE_LBA
+    ):
+        raise BuildError(
+            "Could not reserve the PS2 DVD path-table sectors in the padding extent. "
+            "The directory tree is too large for the current image layout."
+        )
+
+    table_lba = pvd.path_table_location_le
+    table_mba = pvd.path_table_location_be
+    with output.open("r+b") as image:
+        image.seek(table_lba * ISO_LOGICAL_BLOCK_SIZE)
+        type_l_table = image.read(table_size)
+        image.seek(table_mba * ISO_LOGICAL_BLOCK_SIZE)
+        type_m_table = image.read(table_size)
+        if len(type_l_table) != table_size or len(type_m_table) != table_size:
+            raise BuildError("Could not read the ISO9660 path tables for PS2 DVD alignment.")
+
+        image.seek(PS2_DVD_TYPE_L_PATH_TABLE_LBA * ISO_LOGICAL_BLOCK_SIZE)
+        image.write(type_l_table.ljust(ISO_LOGICAL_BLOCK_SIZE, b"\0"))
+        image.seek(PS2_DVD_TYPE_M_PATH_TABLE_LBA * ISO_LOGICAL_BLOCK_SIZE)
+        image.write(type_m_table.ljust(ISO_LOGICAL_BLOCK_SIZE, b"\0"))
+
+        # PS2 DVD cdvdman expects Type-L/Type-M path tables at these fixed LBAs.
+        image.seek(pvd.extent_location() * ISO_LOGICAL_BLOCK_SIZE)
+        descriptor = bytearray(image.read(ISO_LOGICAL_BLOCK_SIZE))
+        if descriptor[1:6] != b"CD001":
+            raise BuildError("Could not locate the output ISO9660 primary volume descriptor.")
+        struct.pack_into("<I", descriptor, 140, PS2_DVD_TYPE_L_PATH_TABLE_LBA)
+        struct.pack_into("<I", descriptor, 144, 0)
+        struct.pack_into(">I", descriptor, 148, PS2_DVD_TYPE_M_PATH_TABLE_LBA)
+        struct.pack_into(">I", descriptor, 152, 0)
+        image.seek(pvd.extent_location() * ISO_LOGICAL_BLOCK_SIZE)
+        image.write(descriptor)
+        image.flush()
+        os.fsync(image.fileno())
+
+
 def write_iso(settings: Settings) -> None:
     pycdlib = require_module("pycdlib", "pycdlib")
 
@@ -587,6 +649,7 @@ def write_iso(settings: Settings) -> None:
     settings.output.parent.mkdir(parents=True, exist_ok=True)
 
     iso = pycdlib.PyCdlib()
+    padding = io.BytesIO(bytes(PS2_DVD_PAD_SIZE))
     added = 0
     try:
         iso.new(
@@ -595,6 +658,10 @@ def write_iso(settings: Settings) -> None:
             joliet=None,
             rock_ridge=None,
         )
+        # Keep LBA 257 and 259 inside an unused file extent so the PS2 DVD
+        # path tables can be written at their fixed locations without
+        # overwriting game data.
+        iso.add_fp(padding, PS2_DVD_PAD_SIZE, iso_path=PS2_DVD_PAD_PATH)
 
         for root, directories, files in os.walk(settings.build):
             directories.sort()
@@ -611,6 +678,7 @@ def write_iso(settings: Settings) -> None:
 
         log.info("      Packaging %d files ...", added)
         iso.write(str(settings.output))
+        patch_ps2_dvd_path_tables(settings.output, iso)
     finally:
         iso.close()
 
@@ -721,12 +789,22 @@ def verify_output(settings: Settings) -> None:
     required_entries = (
         *REQUIRED_ISO_ENTRIES,
         f"/{profile.executable};1",
+        PS2_DVD_PAD_PATH,
     )
     files = 0
     directories = 0
     iso = pycdlib.PyCdlib()
     try:
         iso.open(str(output))
+
+        if (
+            iso.pvd.path_table_location_le != PS2_DVD_TYPE_L_PATH_TABLE_LBA
+            or iso.pvd.path_table_location_be != PS2_DVD_TYPE_M_PATH_TABLE_LBA
+        ):
+            raise BuildError(
+                "The output ISO does not use the PS2 DVD path-table layout "
+                "(Type-L at sector 257, Type-M at sector 259)."
+            )
 
         for required in required_entries:
             try:
@@ -806,7 +884,7 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "package",
         "Writing ISO",
-        "Package the build folder as an ISO9660 level 2 image.",
+        "Write ISO9660 level 2 and PS2 DVD path tables at their required sectors.",
         package_stage,
     ),
     Stage(
