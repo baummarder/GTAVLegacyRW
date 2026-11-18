@@ -489,6 +489,7 @@ Roadmap for the next steps:
 4. **Compatibility check on hardware** – Verify a release build in PCSX2 and on a real PS2 (OPL/FreeMcBoot), including audio streaming.
 5. **Release process** – Versioning, changelog, publish the hash of the generated ISO.
 6. **Cleanup** – Remove the legacy `IMGconsole_32-bit/` tools and `src/assets/build.txt` once the Python build has proven itself.
+7. **Long-term: online multiplayer** – Investigate XLink Kai support. Kai only tunnels games with LAN/system-link support, so GTA V Legacy would first need its own PS2 networking and game-state synchronization.
 
 When developing further, remember: **`src/` is the source of truth.** Anything that only exists in `build/` or `IMGconsole_32-bit/` is disposable.
 
