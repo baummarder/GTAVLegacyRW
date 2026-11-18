@@ -1,7 +1,5 @@
 # GTA V Legacy
 
-![GTA V Legacy — Los Santos and San Andreas on PlayStation 2](docs/readme-banner.svg)
-
 ### Los Santos energy. San Andreas streets. PlayStation 2.
 
 An unofficial conversion project bringing selected **GTA V vehicles, weapons, audio and visual assets** into **GTA San Andreas for PlayStation 2**. The Python build tool applies the project files to a compatible San Andreas ISO and creates a new image.
@@ -18,7 +16,6 @@ The output is intended for emulators such as PCSX2 and real PS2 hardware using O
 
 [Build your ISO](#quick-start) · [CLI reference](#command-line) · [Project lineage](#project-lineage) · [Deutsch](README.de.md)
 
----
 ---
 
 ## Contents
@@ -96,7 +93,7 @@ Asset categories included:
 |---|---|
 | **Python 3.9+** | Tested with Python 3.14 on Windows. Invoke it as `python` (or `python3` on Linux/macOS). |
 | **Python packages** | `pip install -r requirements.txt` (installs `pycdlib` and `py7zr`) |
-| **Original ISO** | *Grand Theft Auto - San Andreas (USA) (v1.03)* – NTSC-U. Other versions will not work without adapting the `data/` files. |
+| **Original ISO** | *Grand Theft Auto - San Andreas (USA) (v1.03)* – NTSC-U. PAL and other regional versions are not supported. |
 | **Free disk space** | Several GB – the ISO is extracted, the new ISO is written next to it, and audio archives are unpacked temporarily. |
 | **Operating system** | Windows, Linux or macOS. No external tools required. |
 
@@ -109,7 +106,9 @@ MD5:  c383c015065f8060343032480928d08d
 SHA1: 66cb01a8281cc132e023a1e52afc75d1fad3fbe1
 ```
 
-If your **US NTSC-U v1.03** ISO has been modified and its checksum no longer matches, pass `--allow-modded` or set `allow_modded = True` in `config.ini`. This skips the hash check only; it does not make PAL or another regional version compatible.
+If your **US NTSC-U v1.03** ISO has been modified and its checksum no longer matches, pass `--allow-modded` or set `allow_modded = True` in `config.ini`. This skips the hash check only. PAL support needs a separate port of the executable patches and regional game data, followed by boot and gameplay testing; it is not currently available.
+
+See the [PAL support roadmap](docs/PAL_SUPPORT.md) for the porting and PS2 test plan.
 
 ---
 

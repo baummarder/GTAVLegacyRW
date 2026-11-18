@@ -1,7 +1,5 @@
 # GTA V Legacy
 
-![GTA V Legacy – Los Santos und San Andreas auf PlayStation 2](docs/readme-banner.svg)
-
 ### Los Santos. San Andreas. PlayStation 2.
 
 Ein inoffizielles Konvertierungsprojekt, das ausgewählte **Fahrzeuge, Waffen, Audio- und Grafik-Assets aus GTA V** in **GTA San Andreas für PlayStation 2** bringt. Das Python-Build-Tool überträgt die Projektdateien auf ein kompatibles San-Andreas-ISO und erstellt daraus ein neues Image.
@@ -18,7 +16,6 @@ Das fertige Image ist für Emulatoren wie PCSX2 und echte PS2-Hardware mit OPL/F
 
 [ISO bauen](#schnellstart) · [CLI-Referenz](#kommandozeile) · [Projekt-Historie](#projekt-historie) · [English](README.md)
 
----
 ---
 
 ## Inhalt
@@ -96,7 +93,7 @@ Enthaltene Asset-Kategorien:
 |---|---|
 | **Python 3.9+** | Getestet mit Python 3.14 unter Windows. Aufruf über `python` (unter Linux/macOS auch `python3`). |
 | **Python-Pakete** | `pip install -r requirements.txt` (installiert `pycdlib` und `py7zr`) |
-| **Original-ISO** | *Grand Theft Auto - San Andreas (USA) (v1.03)* – NTSC-U. Andere Versionen funktionieren nicht ohne Anpassung der `data/`-Dateien. |
+| **Original-ISO** | *Grand Theft Auto - San Andreas (USA) (v1.03)* – NTSC-U. PAL- und andere Regionalversionen werden nicht unterstützt. |
 | **Freier Speicher** | Mehrere GB – das ISO wird entpackt, das neue ISO daneben geschrieben und Audio-Archive temporär entpackt. |
 | **Betriebssystem** | Windows, Linux oder macOS. Keine externen Tools nötig. |
 
@@ -109,7 +106,9 @@ MD5:  c383c015065f8060343032480928d08d
 SHA1: 66cb01a8281cc132e023a1e52afc75d1fad3fbe1
 ```
 
-Wurde dein **US-NTSC-U-v1.03-ISO** modifiziert und stimmt die Prüfsumme deshalb nicht mehr, nutze `--allow-modded` oder setze `allow_modded = True` in `config.ini`. Damit wird nur die Hash-Prüfung übersprungen; PAL- und andere Regionalversionen werden dadurch nicht kompatibel.
+Wurde dein **US-NTSC-U-v1.03-ISO** modifiziert und stimmt die Prüfsumme deshalb nicht mehr, nutze `--allow-modded` oder setze `allow_modded = True` in `config.ini`. Damit wird nur die Hash-Prüfung übersprungen. PAL-Support braucht einen eigenen Port der Executable-Patches und regionalen Spieldaten sowie anschließende Boot- und Spieltests; aktuell ist er nicht verfügbar.
+
+Der [PAL-Fahrplan](docs/PAL_SUPPORT.md) beschreibt die nötigen Anpassungen und Tests auf der PS2.
 
 ---
 
