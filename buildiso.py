@@ -93,6 +93,8 @@ REQUIRED_ISO_ENTRIES = (
     "/SYSTEM.CNF;1",
     "/MODELS/GTA3.IMG;1",
     "/MODELS/GTA_INT.IMG;1",
+    "/MOVIES/OPEN1.PSS;1",
+    "/MOVIES/VCNTSC.PSS;1",
 )
 
 log = logging.getLogger("gtavlegacy")
@@ -415,6 +417,31 @@ def extract_iso(src: Path, dst: Path) -> None:
         iso.close()
 
 
+def restore_required_movies(src: Path, build: Path) -> None:
+    """Keep the original NTSC intro movies available in reused build folders."""
+    movie_names = ("OPEN1.PSS", "VCNTSC.PSS")
+    missing = [name for name in movie_names if not (build / "movies" / name).is_file()]
+    if not missing:
+        return
+
+    pycdlib = require_module("pycdlib", "pycdlib")
+    iso = pycdlib.PyCdlib()
+    try:
+        iso.open(str(src))
+        for name in missing:
+            target = build / "movies" / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with target.open("wb") as outfile:
+                    iso.get_file_from_iso_fp(outfile, iso_path=f"/MOVIES/{name};1")
+            except Exception as exc:
+                raise BuildError(
+                    f"Could not restore required startup movie MOVIES/{name} from the input ISO."
+                ) from exc
+    finally:
+        iso.close()
+
+
 def install_project_files(project: Path, build: Path) -> None:
     for name in ("intro", "text", "data"):
         copy_tree(project / name, build / name)
@@ -431,8 +458,9 @@ def install_project_files(project: Path, build: Path) -> None:
 
     copy_tree_contents(project / "overlays", build)
 
-    # Files that must not end up in the final ISO.
-    for stale in (build / "models" / "gta3_1.img", build / "movies"):
+    # This split image is an extraction artifact; the original movies folder
+    # contains the intro videos GTA SA needs during startup.
+    for stale in (build / "models" / "gta3_1.img",):
         if stale.is_dir():
             log.debug("Removing stale folder: %s", stale)
             shutil.rmtree(stale)
@@ -734,6 +762,7 @@ def prepare_build_folder(settings: Settings) -> None:
 def extract_stage(settings: Settings) -> None:
     if settings.reuse_build and (settings.build / "models" / "gta3.img").is_file():
         log.info("      Existing extraction found, skipping.")
+        restore_required_movies(settings.iso, settings.build)
         return
     extract_iso(settings.iso, settings.build)
 
