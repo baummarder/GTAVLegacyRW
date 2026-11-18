@@ -444,7 +444,7 @@ Fehlt der Ordner komplett, warnt der Build und läuft ohne eigenes Audio weiter.
 | Problem | Ursache / Lösung |
 |---|---|
 | Prüfsummen- oder Versionsfehler | Verwende US-NTSC-U v1.03. `--allow-modded` überspringt nur die Prüfsummenprüfung; PAL und andere Versionen bleiben gesperrt. |
-| Weißer Bildschirm in OPL | Prüfe die Boot-ID in `SYSTEM.CNF`; `PAL Safe Boot Test.iso` ist PAL (`SLES_529.27`), nicht NTSC. Lass GSM/Videozwang und Kompatibilitätsmodi beim ersten Test auf Standard. |
+| Weißer Bildschirm in OPL | Prüfe die Boot-ID in `SYSTEM.CNF`; `PAL Safe Boot Test.iso` ist PAL (`SLES_529.27`), nicht NTSC. Lass GSM und Kompatibilitätsmodi auf Standard. Bei USB/Netzwerk den alten Namen `SLUS_209.46.Spielname.iso` probieren; OPL nennt das als Workaround für manche Spiele. |
 | `gta3.img` nicht gefunden | Die ISO-Extraktion ist unvollständig – `build/` löschen und neu bauen. |
 | Alte Assets im ISO | `reuse_build = True` oder `--reuse-build` war aktiv. Mit `--clean` bauen. |
 | `... cannot be stored in a plain ISO9660 image` | Ein Name in `build/` ist länger als 31 Zeichen oder enthält ungültige Zeichen. In `src/` umbenennen. |

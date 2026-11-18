@@ -444,7 +444,7 @@ If the folder is missing entirely, the build warns and continues without custom 
 | Problem | Cause / fix |
 |---|---|
 | Checksum or region error | Use US NTSC-U v1.03. `--allow-modded` skips checksum verification only; PAL and unsupported revisions remain rejected. |
-| White screen in OPL | Check the actual boot ID in `SYSTEM.CNF`; `PAL Safe Boot Test.iso` is PAL (`SLES_529.27`), not NTSC. Leave GSM/video forcing and compatibility modes at their defaults for the first test. |
+| White screen in OPL | Check the actual boot ID in `SYSTEM.CNF`; `PAL Safe Boot Test.iso` is PAL (`SLES_529.27`), not NTSC. Keep GSM and compatibility modes at defaults. For USB/network loading, try the legacy name `SLUS_209.46.Game Name.iso`; OPL documents this as a workaround for some titles. |
 | `gta3.img` not found | The ISO extraction is incomplete – delete `build/` and rebuild. |
 | Stale assets in the ISO | `reuse_build = True` or `--reuse-build` was used. Run with `--clean`. |
 | `... cannot be stored in a plain ISO9660 image` | A name in `build/` is longer than 31 characters or contains unsupported characters. Rename it in `src/`. |
