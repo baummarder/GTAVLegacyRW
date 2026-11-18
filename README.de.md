@@ -1,24 +1,25 @@
 # GTA V Legacy
 
-### Los Santos. San Andreas. PlayStation 2.
+**Los Santos. San Andreas. PlayStation 2.**
 
-Ein inoffizielles Konvertierungsprojekt, das ausgewählte **Fahrzeuge, Waffen, Audio- und Grafik-Assets aus GTA V** in **GTA San Andreas für PlayStation 2** bringt. Das Python-Build-Tool überträgt die Projektdateien auf ein kompatibles San-Andreas-ISO und erstellt daraus ein neues Image.
+Ein inoffizielles Konvertierungsprojekt, das ausgewählte **Fahrzeuge, Waffen, Audio- und Grafik-Assets aus GTA V** nach **GTA San Andreas für PlayStation 2** bringt. Ein plattformübergreifendes Python-Tool überträgt die Projektdateien auf ein kompatibles Spiel-ISO und erstellt daraus ein neues Image.
 
-Der Build läuft mit Python unter **Windows, Linux und macOS**. UltraISO und die alten Windows-Hilfsprogramme werden dafür nicht benötigt.
+Der Build läuft mit Python unter **Windows, Linux und macOS**. UltraISO und die ursprünglichen Windows-Hilfsprogramme sind nicht erforderlich.
 
-Das fertige Image ist für Emulatoren wie PCSX2 und echte PS2-Hardware mit OPL/FreeMcBoot vorgesehen. Kompatibilität und Spielbarkeit sind nicht garantiert.
+Das fertige Image ist für Emulatoren wie PCSX2 und PS2-Hardware mit OPL/FreeMcBoot vorgesehen. Kompatibilität und Spielbarkeit sind nicht garantiert.
 
-> **CLOSED ALPHA** · Das Projekt ist unvollständig; rechne mit fehlenden Assets, Platzhaltern und Abstürzen.
+> **CLOSED ALPHA** · Eine frühe, begrenzte Testphase – noch keine fertige Veröffentlichung. Funktionen und Assets können fehlen; Abstürze sind möglich.
 >
 > **Dieses Repository führt die Legacy von [GTAVLegacy von Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy) weiter.** Siehe [Projekt-Historie](#projekt-historie).
 
-**Persönliche Notiz:** Dieses ist auf absehbare Zeit mein letztes Nebenprojekt. Ich möchte meine Zeit künftig auf einige Dinge konzentrieren, die mir wichtiger sind als das Programmieren.
+**Persönliche Notiz:** Dieses Projekt steht derzeit ganz unten auf meiner Aufgabenliste. Andere Aufgaben haben im Moment Vorrang.
 
-[ISO bauen](#schnellstart) · [CLI-Referenz](#kommandozeile) · [Projekt-Historie](#projekt-historie) · [English](README.md)
+[ISO bauen](#schnellstart) · [Voraussetzungen](#voraussetzungen) · [CLI-Referenz](#kommandozeile) · [Projekt-Historie](#projekt-historie) · [English](README.md)
 
 ---
 
-## Inhalt
+<details>
+<summary>Inhalt</summary>
 
 - [Projekt-Historie](#projekt-historie)
 - [Was das Projekt macht](#was-das-projekt-macht)
@@ -37,6 +38,8 @@ Das fertige Image ist für Emulatoren wie PCSX2 und echte PS2-Hardware mit OPL/F
 - [Hinweise für Entwickler](#hinweise-für-entwickler)
 - [Rechtliches](#rechtliches)
 - [Credits](#credits)
+
+</details>
 
 ---
 
@@ -424,7 +427,7 @@ Fehlt der Ordner komplett, warnt der Build und läuft ohne eigenes Audio weiter.
 
 | Problem | Ursache / Lösung |
 |---|---|
-| Prüfsummen-Fehler | Falsche ISO-Version. Nur NTSC-U v1.03 hat die erwarteten Hashes; sonst `--allow-modded`. |
+| Prüfsummen-Fehler | Verwende die US-NTSC-U-v1.03-Version. Bei einer modifizierten Kopie genau dieser Version überspringt `--allow-modded` nur die Prüfsumme; andere Regionen bleiben inkompatibel. |
 | `gta3.img` nicht gefunden | Die ISO-Extraktion ist unvollständig – `build/` löschen und neu bauen. |
 | Alte Assets im ISO | `reuse_build = True` oder `--reuse-build` war aktiv. Mit `--clean` bauen. |
 | `... cannot be stored in a plain ISO9660 image` | Ein Name in `build/` ist länger als 31 Zeichen oder enthält ungültige Zeichen. In `src/` umbenennen. |

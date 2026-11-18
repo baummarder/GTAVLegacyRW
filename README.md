@@ -1,24 +1,25 @@
 # GTA V Legacy
 
-### Los Santos energy. San Andreas streets. PlayStation 2.
+**Los Santos. San Andreas. PlayStation 2.**
 
-An unofficial conversion project bringing selected **GTA V vehicles, weapons, audio and visual assets** into **GTA San Andreas for PlayStation 2**. The Python build tool applies the project files to a compatible San Andreas ISO and creates a new image.
+An unofficial conversion project bringing selected **GTA V vehicles, weapons, audio and visual assets** to **GTA San Andreas for PlayStation 2**. A cross-platform Python tool applies the project files to a compatible game ISO and creates a new image.
 
-The build runs on **Windows, Linux and macOS** with Python; it does not require UltraISO or the legacy Windows-only tools.
+Build on **Windows, Linux or macOS** with Python. UltraISO and the original Windows-only tools are not required.
 
-The output is intended for emulators such as PCSX2 and real PS2 hardware using OPL/FreeMcBoot. Compatibility and gameplay are not guaranteed.
+The output is intended for emulators such as PCSX2 and PS2 hardware using OPL/FreeMcBoot. Compatibility and gameplay are not guaranteed.
 
-> **CLOSED ALPHA** · The project is incomplete; expect missing assets, placeholders and crashes.
+> **CLOSED ALPHA** · An early, limited test phase—not a finished release. Features and assets may be incomplete, and crashes are possible.
 >
 > **This repository continues the legacy of [GTAVLegacy by Daniel Santos](https://github.com/DanielSant0s/GTAVLegacy).** See [Project lineage](#project-lineage).
 
-**A personal note:** This is my last side project for the foreseeable future. I’m focusing my time on a few priorities that matter more to me than programming.
+**A personal note:** This project is currently at the bottom of my active to-do list. Other priorities come first for now.
 
-[Build your ISO](#quick-start) · [CLI reference](#command-line) · [Project lineage](#project-lineage) · [Deutsch](README.de.md)
+[Build your ISO](#quick-start) · [Requirements](#requirements) · [CLI reference](#command-line) · [Project lineage](#project-lineage) · [Deutsch](README.de.md)
 
 ---
 
-## Contents
+<details>
+<summary>Contents</summary>
 
 - [Project lineage](#project-lineage)
 - [What this project does](#what-this-project-does)
@@ -37,6 +38,8 @@ The output is intended for emulators such as PCSX2 and real PS2 hardware using O
 - [Development notes](#development-notes)
 - [Legal](#legal)
 - [Credits](#credits)
+
+</details>
 
 ---
 
@@ -424,7 +427,7 @@ If the folder is missing entirely, the build warns and continues without custom 
 
 | Problem | Cause / fix |
 |---|---|
-| Checksum error | Wrong ISO version. Only NTSC-U v1.03 has the expected hashes; otherwise use `--allow-modded`. |
+| Checksum error | Use the US NTSC-U v1.03 disc. For a modified copy of that same release, `--allow-modded` skips only the checksum check; other regions remain unsupported. |
 | `gta3.img` not found | The ISO extraction is incomplete – delete `build/` and rebuild. |
 | Stale assets in the ISO | `reuse_build = True` or `--reuse-build` was used. Run with `--clean`. |
 | `... cannot be stored in a plain ISO9660 image` | A name in `build/` is longer than 31 characters or contains unsupported characters. Rename it in `src/`. |
