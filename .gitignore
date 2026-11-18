@@ -357,3 +357,4 @@ sfx-tool/AUDIO/STREAMS/TK.PAK
 /IMGconsole_32-bit/*.img
 __pycache__/
 *.pyc
+/build-ntsc/
