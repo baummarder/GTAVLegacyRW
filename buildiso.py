@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """GTA V Legacy build stages.
 
-Overlays the mod content from ``src/`` onto a supported GTA San Andreas
-(PS2) ISO, rebuilds the ``.img`` archives and writes a new image. US NTSC-U
-v1.03 is verified; PAL v1.00 is experimental. Everything is done in pure
-Python, so the build runs on Windows, Linux and macOS without UltraISO.
+Overlays the mod content from ``src/`` onto the supported US NTSC-U v1.03 GTA
+San Andreas (PS2) ISO, rebuilds the ``.img`` archives and writes a new image.
+PAL is temporarily disabled until its executable and patches are ported.
 
 This module owns the individual build stages and their order. Use ``build.py``
 for the central command line interface; ``python buildiso.py`` still works and
@@ -110,10 +109,7 @@ class RegionProfile:
     executable: str
     label: str
     version: str | None
-    mode: str | None
     reference_checksums: tuple[str, str] | None = None
-    executable_sha1: str | None = None
-    experimental: bool = False
 
 
 REGION_PROFILES: dict[str, RegionProfile] = {
@@ -121,18 +117,11 @@ REGION_PROFILES: dict[str, RegionProfile] = {
         executable="SLUS_209.46",
         label="US NTSC-U v1.03",
         version="1.03",
-        mode="NTSC",
         reference_checksums=(EXPECTED_MD5, EXPECTED_SHA1),
     ),
-    "SLES_529.27": RegionProfile(
-        executable="SLES_529.27",
-        label="PAL v1.00 (experimental)",
-        version="1.00",
-        mode="PAL",
-        executable_sha1="d784af98d54771e15f79c2688f120be6a6a872dc",
-        experimental=True,
-    ),
 }
+
+DISABLED_PAL_EXECUTABLE = "SLES_529.27"
 
 
 @dataclass
@@ -319,10 +308,17 @@ def detect_iso_region(src: Path) -> RegionProfile:
 
         profile = REGION_PROFILES.get(executable or "")
         if profile is None:
+            if executable == DISABLED_PAL_EXECUTABLE:
+                raise BuildError(
+                    "PAL v1.00 (SLES_529.27) is temporarily disabled: the game reaches "
+                    "the PS2 startup screen but does not continue. Use the supported US "
+                    "NTSC-U v1.03 (SLUS_209.46) image. PAL investigation notes: "
+                    "experimental/pal/README.md."
+                )
             found = ", ".join(sorted(root_executables)) or "no recognized executable"
             raise BuildError(
-                "Unsupported GTA San Andreas release. Recognized profiles are "
-                "US NTSC-U v1.03 (SLUS_209.46) and PAL v1.00 (SLES_529.27); "
+                "Unsupported GTA San Andreas release. The only supported profile is "
+                "US NTSC-U v1.03 (SLUS_209.46); "
                 f"SYSTEM.CNF points to {boot_executable or found}."
             )
 
@@ -334,33 +330,13 @@ def detect_iso_region(src: Path) -> RegionProfile:
             ) from exc
 
         version_match = re.search(r"(?im)^\s*VER\s*=\s*([^\s]+)", system_text)
-        mode_match = re.search(r"(?im)^\s*VMODE\s*=\s*([^\s]+)", system_text)
         version = version_match.group(1).strip() if version_match else None
-        mode = mode_match.group(1).strip().upper() if mode_match else None
 
-        if profile.mode == "NTSC" and version and version != profile.version:
+        if version and version != profile.version:
             raise BuildError(
                 f"{profile.executable} detected with VER={version}; this profile requires v{profile.version}."
             )
 
-        # PAL releases reuse this product ID; accept only the v1.00 PAL profile.
-        if profile.mode == "PAL" and (version != profile.version or mode != profile.mode):
-            raise BuildError(
-                "PAL executable SLES_529.27 detected, but the disc does not identify itself "
-                "as PAL v1.00 (VER=1.00, VMODE=PAL). Other PAL revisions are not supported."
-            )
-        if profile.executable_sha1:
-            executable_buffer = io.BytesIO()
-            iso.get_file_from_iso_fp(
-                executable_buffer,
-                iso_path=f"/{profile.executable};1",
-            )
-            executable_sha1 = hashlib.sha1(executable_buffer.getvalue()).hexdigest()
-            if executable_sha1 != profile.executable_sha1:
-                raise BuildError(
-                    f"{profile.label} has an unexpected {profile.executable} executable hash; "
-                    "this revision is not supported by the current profile."
-                )
         return profile
     except BuildError:
         raise
@@ -376,16 +352,12 @@ def check_iso(src: Path, allow_modded: bool) -> RegionProfile:
     if not src.is_file():
         raise BuildError(
             f"ISO not found: {src}\n"
-            "Choose a supported US NTSC-U v1.03 or PAL v1.00 San Andreas ISO, "
+            "Choose a supported US NTSC-U v1.03 San Andreas ISO, "
             "or pass its path with --iso."
         )
 
     profile = detect_iso_region(src)
     log.info("      Detected game: %s (%s)", profile.label, profile.executable)
-    if profile.experimental:
-        log.warning(
-            "      PAL patch compatibility is experimental and has not been verified in-game."
-        )
 
     if allow_modded:
         log.info("      Checksum verification skipped (--allow-modded).")
@@ -394,7 +366,7 @@ def check_iso(src: Path, allow_modded: bool) -> RegionProfile:
     if profile.reference_checksums is None:
         raise BuildError(
             f"Detected {profile.label}, but no reference checksum is configured. "
-            "After confirming this is your clean PAL v1.00 dump, pass --allow-modded to continue."
+            "Configure its reference checksum before building."
         )
 
     expected_md5, expected_sha1 = profile.reference_checksums
@@ -443,9 +415,7 @@ def extract_iso(src: Path, dst: Path) -> None:
         iso.close()
 
 
-def install_project_files(
-    project: Path, build: Path, *, include_console_patches: bool = True
-) -> None:
+def install_project_files(project: Path, build: Path) -> None:
     for name in ("intro", "text", "data"):
         copy_tree(project / name, build / name)
 
@@ -456,25 +426,10 @@ def install_project_files(
     for name in ("CONFIG", "SFX"):
         copy_tree(project / "audio" / name, build / "audio" / name)
 
-    copy_tree(project / "anim", build / "anim")
+    for name in ("anim", "plugins"):
+        copy_tree(project / name, build / name)
 
-    if include_console_patches:
-        copy_tree(project / "plugins", build / "plugins")
-        copy_tree_contents(project / "overlays", build)
-    else:
-        # These modules and plugins contain hard-coded addresses for the
-        # US executable. Remove stale copies too when reusing an old build.
-        for patch in (project / "overlays").iterdir():
-            installed = build / patch.name
-            if installed.is_file():
-                installed.unlink()
-        for plugin in (project / "plugins").iterdir():
-            installed = build / "plugins" / plugin.name
-            if installed.is_file():
-                installed.unlink()
-        log.info(
-            "      Skipping executable-specific overlays and plugins for the experimental PAL profile."
-        )
+    copy_tree_contents(project / "overlays", build)
 
     # Files that must not end up in the final ISO.
     for stale in (build / "models" / "gta3_1.img", build / "movies"):
@@ -666,7 +621,7 @@ def write_iso(settings: Settings) -> None:
     profile = settings.region or detect_iso_region(settings.iso)
     serial = profile.executable.replace("_", "").replace(".", "")
     serial = f"{serial[:4]}-{serial[4:]}"
-    disc_region = "europe" if profile.mode == "PAL" else "america"
+    disc_region = "america"
     temporary_path: Path | None = None
     try:
         fd, temporary_name = tempfile.mkstemp(
@@ -784,12 +739,7 @@ def extract_stage(settings: Settings) -> None:
 
 
 def overlay_stage(settings: Settings) -> None:
-    profile = settings.region or detect_iso_region(settings.iso)
-    install_project_files(
-        settings.project,
-        settings.build,
-        include_console_patches=not profile.experimental,
-    )
+    install_project_files(settings.project, settings.build)
 
 
 def audio_stage(settings: Settings) -> None:
@@ -863,24 +813,6 @@ def verify_output(settings: Settings) -> None:
                 raise BuildError(
                     f"The generated ISO is missing {required.strip('/')}."
                 ) from exc
-
-        if profile.experimental:
-            disabled_patch_paths = [
-                *(Path(patch.name) for patch in (settings.project / "overlays").iterdir()),
-                *(
-                    Path("plugins") / plugin.name
-                    for plugin in (settings.project / "plugins").iterdir()
-                ),
-            ]
-            for relative in disabled_patch_paths:
-                try:
-                    iso.get_record(iso_path=iso_path(relative, is_file=True))
-                except Exception:
-                    continue
-                raise BuildError(
-                    f"Experimental PAL output must not include the unported patch "
-                    f"{relative.as_posix()}."
-                )
 
         pending = [iso.get_record(iso_path="/")]
         while pending:
@@ -1039,7 +971,7 @@ def add_build_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
     parser.add_argument("--project-dir", type=Path, help="Folder containing the mod files")
     parser.add_argument("--build-dir", type=Path, help="Working folder for the extracted ISO")
     parser.add_argument("--allow-modded", action="store_true",
-                        help="Skip ISO checksum verification (required for experimental PAL v1.00)")
+                        help="Skip ISO checksum verification for a known, supported NTSC dump")
 
     extraction = parser.add_mutually_exclusive_group()
     extraction.add_argument("--reuse-build", action="store_true",

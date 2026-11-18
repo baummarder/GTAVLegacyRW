@@ -238,7 +238,7 @@ def run_wizard(args: argparse.Namespace) -> int:
         if settings.region.reference_checksums is None:
             print(
                 f"  Detected: {settings.region.label}. No reference checksum is configured; "
-                "PAL patch compatibility is experimental."
+                "checksum verification cannot be performed."
             )
             if not ask_yes_no("Continue with checksum verification skipped?", False):
                 print("Cancelled.")

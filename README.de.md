@@ -82,8 +82,8 @@ Zusätzlich liegen im Repo PS2-Binärpatches (`src/overlays/*.NM`, `src/plugins/
 |---|---|---|
 | Build-Pipeline | ✅ Implementiert | Erstellt ein ISO und prüft die erforderlichen Dateien. |
 | NTSC-U-v1.03-Eingabe | ✅ Akzeptiert | Build und Patches zielen auf diese Spielversion. |
-| PAL v1.00 (`SLES_529.27`) | 🟡 Experimenteller Build | Erkennung und ISO-Erstellung funktionieren; NTSC-spezifische Overlays/Plugins werden bis zu ihrer Portierung ausgelassen. |
-| Andere PAL-Versionen | ⚪ Nicht unterstützt | Sie werden abgewiesen, bis Executable und Patches ein eigenes Profil haben. |
+| PAL (`SLES_529.27`) | ⛔ Vorübergehend deaktiviert | Der PS2-Startbildschirm erscheint, aber das Spiel startet nicht weiter. Die PAL-Untersuchung liegt getrennt unter `experimental/pal/`. |
+| Andere Regionen/Versionen | ⚪ Nicht unterstützt | Verwende vorerst die unterstützte US-NTSC-U-Version 1.03. |
 | Kompatibilität im Spiel | ⚪ Nicht verifiziert | Ein erfolgreich erstelltes ISO bestätigt noch keine Spielbarkeit auf PCSX2 oder PS2-Hardware. |
 
 Enthaltene Asset-Kategorien:
@@ -111,7 +111,7 @@ Im Repository gibt es noch keine geprüften Gameplay-Screenshots des aktuellen B
 | **Python 3.9+** | Getestet mit Python 3.14 unter Windows. Aufruf über `python` (unter Linux/macOS auch `python3`). |
 | **Python-Pakete** | `pip install -r requirements.txt` (installiert `pycdlib` und `py7zr`) |
 | **PS2-DVD-Writer** | Enthaltene `mkps2iso`-1.1.1-Werkzeuge für Windows, Linux und macOS |
-| **Original-ISO** | US-NTSC-U v1.03 (`SLUS_209.46`) oder experimentell PAL v1.00 (`SLES_529.27`). Andere Versionen und Regionen werden nicht unterstützt. |
+| **Original-ISO** | Nur US-NTSC-U v1.03 (`SLUS_209.46`). PAL und andere Versionen sind vorübergehend nicht unterstützt. |
 | **Freier Speicher** | Mehrere GB – das ISO wird entpackt, das neue ISO daneben geschrieben und Audio-Archive temporär entpackt. |
 | **Betriebssystem** | Windows, Linux oder macOS. Keine externen Tools nötig. |
 
@@ -124,9 +124,9 @@ MD5:  c383c015065f8060343032480928d08d
 SHA1: 66cb01a8281cc132e023a1e52afc75d1fad3fbe1
 ```
 
-Der Builder erkennt die Version über `SYSTEM.CNF` und die Boot-Executable. Für PAL v1.00 ist keine Referenz-Prüfsumme hinterlegt. Bestätige deshalb zuerst deinen sauberen Dump und nutze dann `--allow-modded` oder `allow_modded = True` in `config.ini`. Das überspringt nur die Prüfsumme, nicht die Regions- oder Versionsprüfung. Der PAL-Build bleibt experimentell, bis die Patches im Emulator und auf einer echten PS2 geprüft sind.
+Der Builder erkennt die Version über `SYSTEM.CNF` und die Boot-Executable. PAL v1.00 wird vorübergehend abgewiesen: Es erscheint der PS2-Startbildschirm, aber das Spiel startet auch ohne NTSC-spezifische Overlays und Plugins nicht weiter. `--allow-modded` überspringt nur die Prüfsummenprüfung und aktiviert PAL nicht.
 
-Der [PAL-Fahrplan](docs/PAL_SUPPORT.md) beschreibt die nötigen Anpassungen und Tests auf der PS2.
+Die [experimentellen PAL-Notizen](experimental/pal/README.md) halten den aktuellen Stand und die offenen Ursachen fest.
 
 ---
 
@@ -140,9 +140,9 @@ python -m pip install -r requirements.txt
 
 ### 2. Original-ISO bereitstellen
 
-Verwende ein legal erworbenes **GTA San Andreas (USA, NTSC-U v1.03)** oder **PAL v1.00 für PS2**. Der Builder erkennt die Region automatisch. Lege das ISO in den Projektordner oder übergib den Pfad mit `--iso`.
+Verwende ein legal erworbenes **GTA San Andreas (USA, NTSC-U v1.03)** für PS2. Der Builder prüft die Version automatisch. Lege das ISO in den Projektordner oder übergib den Pfad mit `--iso`.
 
-Vor Änderungen am Build-Ordner erkennt das Tool die Region. NTSC-U v1.03 wird mit MD5/SHA1 geprüft; bei PAL v1.00 musst du den Dump bestätigen, da keine Referenz-Prüfsumme hinterlegt ist. Andere Versionen werden abgewiesen.
+Vor Änderungen am Build-Ordner erkennt das Tool die Version. NTSC-U v1.03 wird mit MD5/SHA1 geprüft. PAL und andere Versionen werden abgewiesen, bevor der Build-Ordner geändert wird.
 
 ### 3. Einrichtung prüfen und bauen
 
@@ -443,7 +443,7 @@ Fehlt der Ordner komplett, warnt der Build und läuft ohne eigenes Audio weiter.
 
 | Problem | Ursache / Lösung |
 |---|---|
-| Prüfsummen- oder Regionsfehler | Verwende US-NTSC-U v1.03 oder PAL v1.00. `--allow-modded` überspringt nur die Prüfsumme; nicht unterstützte Versionen und Regionen werden weiter abgewiesen. |
+| Prüfsummen- oder Versionsfehler | Verwende US-NTSC-U v1.03. `--allow-modded` überspringt nur die Prüfsummenprüfung; PAL und andere Versionen bleiben gesperrt. |
 | `gta3.img` nicht gefunden | Die ISO-Extraktion ist unvollständig – `build/` löschen und neu bauen. |
 | Alte Assets im ISO | `reuse_build = True` oder `--reuse-build` war aktiv. Mit `--clean` bauen. |
 | `... cannot be stored in a plain ISO9660 image` | Ein Name in `build/` ist länger als 31 Zeichen oder enthält ungültige Zeichen. In `src/` umbenennen. |
